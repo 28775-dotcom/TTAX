@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<iframe id="f" src="index.html"></iframe>
+<script>
+window.onload = function() {
+  setTimeout(() => {
+    const doc = document.getElementById('f').contentDocument;
+    const settingsModal = doc.getElementById('modal-settings');
+    console.log('SETTINGS_MODAL_TEXT_START');
+    console.log(settingsModal.innerText);
+    console.log('SETTINGS_MODAL_TEXT_END');
+  }, 1000);
+};
+</script>
+</body>
+</html>

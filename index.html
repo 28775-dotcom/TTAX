@@ -1,0 +1,2106 @@
+<?php
+// index.php - หน้าหลักระบบ TAX (ระบบคำนวณภาษีเงินได้บุคคลธรรมดา และ นิติบุคคล)
+?>
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>TAX PORTAL - ระบบคำนวณและวางแผนภาษี (บุคคลธรรมดา & นิติบุคคล)</title>
+  <meta name="description" content="ระบบคำนวณภาษีเงินได้บุคคลธรรมดา (ภ.ง.ด. 90/91) และภาษีเงินได้นิติบุคคล (ภ.ง.ด. 50/51) เกณฑ์ปีล่าสุด 2567/2568 หักค่าใช้จ่ายอัตโนมัติ โปรไฟล์สมาชิก และแดชบอร์ดผู้ดูแลระบบ">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏛️</text></svg>">
+</head>
+<body>
+
+  <!-- แถบสีทองราชการด้านบนสุด -->
+  <div class="top-gov-stripe"></div>
+
+  <!-- ส่วนหัวเว็บไซต์ (Header) สไตล์หน่วยงานทางการ -->
+  <header class="site-header">
+    <div class="header-container">
+      <a href="index.php" class="gov-brand">
+        <div class="emblem-icon">🏛️</div>
+        <div class="brand-text">
+          <h1>
+            <span data-i18n="app_title">TAX PORTAL</span>
+            <span class="tag-badge" id="header-form-badge">ภ.ง.ด. 90/91 & 50</span>
+          </h1>
+          <p data-i18n="app_subtitle">ระบบบริการและคำนวณภาษีเงินได้บุคคลธรรมดาและนิติบุคคล e-Tax Portal</p>
+        </div>
+      </a>
+
+      <!-- ส่วนสมาชิก/เข้าสู่ระบบ และเครื่องมือผู้ดูแลระบบ -->
+      <div class="header-actions" id="header-actions-group">
+        <label class="tax-year-header-wrap" for="global-tax-year">
+          <span data-i18n="nav_tax_year">ปีภาษี</span>
+          <select id="global-tax-year" class="input-control tax-year-select" aria-label="ปีภาษี">
+            <option value="2566">2566</option>
+            <option value="2567" selected>2567</option>
+            <option value="2568">2568</option>
+          </select>
+        </label>
+        <button type="button" id="btn-toggle-theme" class="btn btn-secondary btn-sm" title="สลับโหมดมืด/สว่าง" aria-label="Dark Mode">🌙</button>
+        <button type="button" id="btn-open-saved-header" class="btn btn-secondary btn-sm" title="ข้อมูลภาษีที่บันทึกไว้ของฉัน">📂 <span data-i18n="btn_saved_records">ข้อมูลภาษีที่บันทึกไว้</span></button>
+        <button type="button" id="btn-open-settings" class="btn btn-secondary btn-sm" title="ตั้งค่าระบบ / Settings" aria-label="Settings">⚙️ <span data-i18n="btn_settings">ตั้งค่า</span></button>
+        <div id="header-user-section">
+          <button id="btn-open-login" class="btn btn-secondary btn-sm" data-i18n="btn_login">🔑 เข้าสู่ระบบ</button>
+          <button id="btn-open-register" class="btn btn-primary btn-sm" data-i18n="btn_register">📝 สมัครสมาชิก</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- แถบแจ้งเตือนสำหรับผู้ใช้ทั่วไป (Guest) -->
+  <div class="guest-notice-bar" id="guest-notice-bar">
+    <span>💡 <strong data-i18n="guest_notice_prefix">คำแนะนำ:</strong> <span data-i18n="guest_notice_text">ขณะนี้ท่านใช้งานในฐานะบุคคลทั่วไป สามารถคำนวณภาษีได้เต็มรูปแบบ หากต้องการบันทึกข้อมูลและตั้งค่าโปรไฟล์</span> <a class="guest-notice-link" id="guest-login-cta" data-i18n="guest_notice_cta">กรุณาเข้าสู่ระบบหรือสมัครสมาชิก</a></span>
+  </div>
+
+  <!-- แถบกำหนดการยื่นภาษี (Tax Filing Deadlines Banner) -->
+  <div class="deadline-banner" id="deadline-banner">
+    <div class="deadline-banner-content">
+      <div class="deadline-icon">📅</div>
+      <div class="deadline-text">
+        <h3>กำหนดการยื่นภาษี ปี 2567 (รอบ พ.ศ. 2568)</h3>
+        <div class="deadline-items">
+          <div class="deadline-item">
+            <span class="deadline-label">บุคคลธรรมดา (ภ.ง.ด. 90/91):</span>
+            <span class="deadline-date">1 - 31 มีนาคม 2568</span>
+            <span class="deadline-status" id="deadline-status-individual">📍 เหลือเวลา 6 เดือน</span>
+          </div>
+          <div class="deadline-item">
+            <span class="deadline-label">นิติบุคคล (ภ.ง.ด. 50):</span>
+            <span class="deadline-date">31 พฤษภาคม 2568</span>
+            <span class="deadline-status" id="deadline-status-corporate">📍 เหลือเวลา 8 เดือน</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hero Section สื่อถึงการคำนวณบัญชีและภาษีอย่างชัดเจนด้วยภาพและแบบจำลองทันใจ -->
+  <section class="hero-section">
+    <div class="hero-card">
+      <div class="hero-showcase-grid">
+        <div class="hero-text">
+          <h2>
+            <span data-i18n="hero_title">ระบบคำนวณบัญชีและภาษีอัจฉริยะ</span>
+            <span class="hero-badge-year" data-i18n="hero_badge">ปีภาษี 2567 / 2568 ล่าสุด</span>
+          </h2>
+          <p data-i18n="hero_desc">คำนวณภาษีสะดวกรวดเร็ว ระบบหักค่าใช้จ่ายเหมาให้อัตโนมัติตามกฎหมาย 100% พร้อมเชื่อมต่อฐานข้อมูลคลาวด์ Supabase และออกรายงานภาษีฉบับสมบูรณ์</p>
+          
+          <!-- แบบจำลองบัญชี-ภาษีทันใจ (Interactive Quick-Simulator Widget) -->
+          <div class="quick-sim-container">
+            <div class="quick-sim-header">
+              <h4 data-i18n="sim_title">📊 แบบจำลองบัญชี-ภาษีทันใจ (Quick Simulator)</h4>
+              <span class="tag-badge">ทดลองเลื่อนดูผลลัพธ์</span>
+            </div>
+            <div class="quick-sim-controls">
+              <input type="range" id="quick-sim-slider" class="quick-sim-slider" min="150000" max="3000000" step="50000" value="600000" aria-label="ประมาณการรายได้ทั้งปี">
+              <div class="quick-sim-val-display" id="quick-sim-display">600,000 บาท/ปี</div>
+            </div>
+            <div class="quick-sim-stats-grid">
+              <div class="quick-sim-stat">
+                <span class="stat-lbl" data-i18n="sim_std_tax">ภาษีที่ต้องเสีย (ก่อนวางแผน):</span>
+                <span class="stat-num" id="quick-sim-tax-before">29,000 บาท</span>
+              </div>
+              <div class="quick-sim-stat">
+                <span class="stat-lbl" data-i18n="sim_opt_tax">ภาษีที่เสียจริง (หลังวางแผน):</span>
+                <span class="stat-num" id="quick-sim-tax-after">14,000 บาท</span>
+              </div>
+              <div class="quick-sim-stat">
+                <span class="stat-lbl" data-i18n="sim_saved">ประหยัดภาษีได้ถึง:</span>
+                <span class="stat-num saved-highlight" id="quick-sim-tax-saved">💰 15,000 บาท (51.7%)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Presets -->
+          <div class="hero-quick-tools" style="margin-top:1rem;">
+            <button id="preset-salary" class="btn btn-outline-gold btn-sm" data-i18n="preset_salary">👔 ตัวอย่าง: บุคคลธรรมดา (เงินเดือน & Thai ESG)</button>
+            <button id="preset-freelance" class="btn btn-outline-gold btn-sm" data-i18n="preset_freelance">💻 ตัวอย่าง: บุคคลธรรมดา (ฟรีแลนซ์ & กองทุน)</button>
+            <button id="preset-corp-sme" class="btn btn-outline-gold btn-sm" data-i18n="preset_corp_sme">🏢 ตัวอย่าง: นิติบุคคล (SME กำไร 2.8 ล้าน)</button>
+            <button id="preset-reset" class="btn btn-secondary btn-sm" data-i18n="preset_reset">🔄 ล้างข้อมูลทั้งหมด</button>
+          </div>
+        </div>
+
+        <!-- Hero Visual Image Column -->
+        <div class="hero-visual-col">
+          <div class="hero-img-wrapper">
+            <img src="assets/images/accounting_hero.jpg" alt="ระบบบัญชีและการคำนวณภาษีอัจฉริยะ" class="hero-accounting-img" loading="lazy">
+            <div class="hero-img-badge">
+              <span>🏛️ ระบบบัญชี & ภาษีมาตรฐานไทย</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- อินโฟกราฟิกกระบวนการคำนวณบัญชีและภาษี 3 ขั้นตอน -->
+  <section class="accounting-workflow-section">
+    <div class="accounting-wf-header">
+      <h3 class="font-prompt">✨ กระบวนการคำนวณบัญชีและภาษีใน 3 ขั้นตอนง่าย ๆ</h3>
+      <p style="color:var(--text-muted); font-size:0.88rem; margin-top:0.25rem;">ระบบอัตโนมัติ ช่วยให้การจัดการภาษีเป็นเรื่องง่ายและถูกต้องตามประมวลรัษฎากร</p>
+    </div>
+    <div class="accounting-wf-grid">
+      <div class="accounting-wf-card">
+        <div class="wf-icon-badge">📘</div>
+        <h4 data-i18n="wf_step1_title">1. บันทึกบัญชีรายได้</h4>
+        <p data-i18n="wf_step1_desc">จำแนก 8 ประเภทเงินได้ 40(1)-40(8) และรายรับนิติบุคคลอย่างเป็นระบบ ครอบคลุมทั้งเงินเดือน ฟรีแลนซ์ และธุรกิจ</p>
+      </div>
+      <div class="accounting-wf-card">
+        <div class="wf-icon-badge">⚖️</div>
+        <h4 data-i18n="wf_step2_title">2. วิเคราะห์ต้นทุน & ลดหย่อน</h4>
+        <p data-i18n="wf_step2_desc">คำนวณหักค่าใช้จ่ายเหมา 50-60% อัตโนมัติ พร้อมสิทธิลดหย่อนกองทุน Thai ESG, RMF, SSF และประกันชีวิต</p>
+      </div>
+      <div class="accounting-wf-card">
+        <div class="wf-icon-badge">📑</div>
+        <h4 data-i18n="wf_step3_title">3. สรุปภาษี & ออกแบบพิมพ์</h4>
+        <p data-i18n="wf_step3_desc">แสดงขั้นบันไดภาษี เปรียบเทียบภาษีที่ต้องชำระจริง สรุปเงินคืนภาษี พร้อมพิมพ์แบบ ภ.ง.ด. 90/91/50 ทันที</p>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- เนื้อหาหลัก (Main Content) -->
+  <main class="main-content">
+
+    <div class="wizard-container">
+
+      <!-- ตัวเลือกประเภทผู้เสียภาษี (บุคคลธรรมดา vs นิติบุคคล) -->
+      <div class="taxpayer-selector-card">
+        <div class="taxpayer-selector-header">
+          <h3>📌 คุณเป็นใคร: กรุณาเลือกประเภทผู้เสียภาษี</h3>
+          <span class="tag-badge" id="active-taxpayer-badge">บุคคลธรรมดา</span>
+        </div>
+        <div class="taxpayer-tabs">
+          <button type="button" class="taxpayer-type-btn active" id="btn-type-individual" data-type="individual">
+            <div class="type-btn-icon">👤</div>
+            <div class="type-btn-text">
+              <h4>บุคคลธรรมดา (ภ.ง.ด. 90/91)</h4>
+              <p>มนุษย์เงินเดือน, ฟรีแลนซ์, วิชาชีพอิสระ, ค้าขายส่วนบุคคล (หักค่าใช้จ่ายเหมาอัตโนมัติ 100%)</p>
+            </div>
+          </button>
+
+          <button type="button" class="taxpayer-type-btn" id="btn-type-corporate" data-type="corporate">
+            <div class="type-btn-icon">🏢</div>
+            <div class="type-btn-text">
+              <h4>นิติบุคคล (ภ.ง.ด. 50/51)</h4>
+              <p>บริษัทจำกัด, ห้างหุ้นส่วนนิติบุคคล, ธุรกิจ SME (อัตราภาษี 0%, 15%, 20% หรือทั่วไป 20%)</p>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs สเต็ปวิซาร์ด (3 ขั้นตอนกระชับ: 1.รายได้ -> 2.ลดหย่อน -> 3.สรุปผล) -->
+      <div class="wizard-nav">
+        <button class="wizard-step-btn active" data-step="1" id="nav-step1">
+          <div class="step-num">1</div>
+          <div class="step-title">
+            <span class="primary" id="nav-title-step1">เงินได้พึงประเมิน</span>
+            <span class="sub" id="nav-sub-step1">หักค่าใช้จ่ายอัตโนมัติ</span>
+          </div>
+        </button>
+
+        <button class="wizard-step-btn locked" data-step="2" id="nav-step2">
+          <div class="step-num">2</div>
+          <div class="step-title">
+            <span class="primary" id="nav-title-step2">ค่าลดหย่อนภาษี</span>
+            <span class="sub" id="nav-sub-step2">สิทธิประโยชน์ทางภาษี</span>
+          </div>
+        </button>
+
+        <button class="wizard-step-btn locked" data-step="3" id="nav-step3">
+          <div class="step-num">3</div>
+          <div class="step-title">
+            <span class="primary" id="nav-title-step3">สรุปผลภาษีฉบับสมบูรณ์</span>
+            <span class="sub" id="nav-sub-step3">เห็นผลสรุปทันที</span>
+          </div>
+        </button>
+      </div>
+
+
+      <!-- ===================================================================
+           STEP 1: รายได้ (INCOME / REVENUE) - หักค่าใช้จ่ายอัตโนมัติทันที
+           =================================================================== -->
+      <section id="panel-step1" class="wizard-panel active">
+        
+        <!-- [โหมดบุคคลธรรมดา] รายได้ 40(1) - 40(8) -->
+        <div id="ind-step1-fields">
+          <div class="card-box">
+            <div class="card-header-bar">
+              <div class="card-title-group">
+                <div class="card-icon">💼</div>
+                <div>
+                  <h3>เงินเดือน ค่าจ้าง และงานบริการ (มาตรา 40(1) และ 40(2))</h3>
+                  <p>ระบบหักค่าใช้จ่ายเหมา 50% สูงสุด 100,000 บาท ให้อัตโนมัติทันที</p>
+                </div>
+              </div>
+            </div>
+            <div class="input-grid">
+              <div class="form-group">
+                <label class="form-label" for="inc_40_1">
+                  <span>40(1) เงินเดือน ค่าจ้าง โบนัส บำเหน็จ <button type="button" class="tip-btn" data-tip="มาตรา 40(1) คือเงินได้จากการจ้างแรงงาน เช่น พนักงานประจำ เงินเดือน โบนัส ค่าล่วงเวลา บำเหน็จ บำนาญ ค่าครองชีพ">?</button></span>
+                  <span class="form-hint">ตลอดทั้งปี</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="inc_40_1" class="input-control" placeholder="0" min="0" step="100">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="inc_40_2">
+                  <span>40(2) ค่าจ้างทั่วไป ค่านายหน้า ฟรีแลนซ์ <button type="button" class="tip-btn" data-tip="มาตรา 40(2) คือเงินได้จากหน้าที่หรืองานที่ทำ เช่น ฟรีแลนซ์ ค่านายหน้า เบี้ยประชุม ค่าวิทยากร รับจ้างเป็นงาน ๆ ไม่ใช่เงินเดือนประจำ">?</button></span>
+                  <span class="form-hint">รับจ้างเป็นจ๊อบ/เบี้ยประชุม</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="inc_40_2" class="input-control" placeholder="0" min="0" step="100">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-box">
+            <div class="card-header-bar">
+              <div class="card-title-group">
+                <div class="card-icon">💡</div>
+                <div>
+                  <h3>ลิขสิทธิ์ ดอกเบี้ย และเงินปันผล (มาตรา 40(3) และ 40(4))</h3>
+                  <p>40(3) หักค่าใช้จ่ายเหมา 50% ไม่เกิน 100,000 บาท อัตโนมัติ</p>
+                </div>
+              </div>
+            </div>
+            <div class="input-grid">
+              <div class="form-group">
+                <label class="form-label" for="inc_40_3">
+                  <span>40(3) ค่าลิขสิทธิ์ สิทธิบัตร ทรัพย์สินทางปัญญา <button type="button" class="tip-btn" data-tip="มาตรา 40(3) คือค่าแห่งกู๊ดวิลล์ ลิขสิทธิ์ สิทธิบัตร เครื่องหมายการค้า เงินได้จากทรัพย์สินทางปัญญา หรือค่าสิทธิอื่น">?</button></span>
+                  <span class="form-hint">งานเขียน / ลิขสิทธิ์</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="inc_40_3" class="input-control" placeholder="0" min="0" step="100">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="inc_40_4">
+                  <span>40(4) ดอกเบี้ย เงินปันผล คริปโทเคอร์เรนซี <button type="button" class="tip-btn" data-tip="มาตรา 40(4) คือเงินได้จากดอกเบี้ย เงินปันผล ส่วนแบ่งกำไร ผลประโยชน์จากการลงทุน รวมคริปโทและโทเคนดิจิทัล หักค่าใช้จ่ายไม่ได้">?</button></span>
+                  <span class="form-hint">หักค่าใช้จ่ายไม่ได้</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="inc_40_4" class="input-control" placeholder="0" min="0" step="100">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-box">
+            <div class="card-header-bar">
+              <div class="card-title-group">
+                <div class="card-icon">🏠</div>
+                <div>
+                  <h3>ค่าเช่าทรัพย์สิน (มาตรา 40(5)) <button type="button" class="tip-btn" data-tip="มาตรา 40(5) คือเงินได้จากการให้เช่าทรัพย์สิน เช่น บ้าน คอนโด ที่ดิน รถยนต์ เรือ หรือทรัพย์สินอื่น">?</button></h3>
+                  <p>ระบบหักค่าใช้จ่ายเหมาตามประเภททรัพย์สิน (10% - 30%) ให้อัตโนมัติ</p>
+                </div>
+              </div>
+            </div>
+            <div class="input-grid">
+              <div class="form-group">
+                <label class="form-label" for="inc_40_5_building">
+                  <span>บ้าน อาคาร โรงเรือน สิ่งปลูกสร้าง (หักเหมาอัตโนมัติ 30%)</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="inc_40_5_building" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="inc_40_5_vehicle">
+                  <span>ยานพาหนะ (รถยนต์ เรือ) (หักเหมาอัตโนมัติ 30%)</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="inc_40_5_vehicle" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="inc_40_5_agri">
+                  <span>ที่ดินใช้ในการเกษตรกรรม (หักเหมาอัตโนมัติ 20%)</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="inc_40_5_agri" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="inc_40_5_other_land">
+                  <span>ที่ดินไม่ได้ใช้ในการเกษตรกรรม (หักเหมาอัตโนมัติ 15%)</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="inc_40_5_other_land" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="inc_40_5_other">
+                  <span>ทรัพย์สินอื่น ๆ (หักเหมาอัตโนมัติ 10%)</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="inc_40_5_other" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-box">
+            <div class="card-header-bar">
+              <div class="card-title-group">
+                <div class="card-icon">🩺</div>
+                <div>
+                  <h3>วิชาชีพอิสระ รับเหมา และธุรกิจ (มาตรา 40(6), 40(7), 40(8))</h3>
+                  <p>ระบบหักค่าใช้จ่ายเหมาอัตโนมัติ: แพทย์ 60%, วิชาชีพอื่น 30%, รับเหมา 60%, ธุรกิจ 60%</p>
+                </div>
+              </div>
+            </div>
+            <div class="input-grid">
+              <div class="form-group">
+                <label class="form-label" for="inc_40_6_medical">
+                  <span>40(6) วิชาชีพประกอบโรคศิลปะ (แพทย์/พยาบาล) <button type="button" class="tip-btn" data-tip="มาตรา 40(6) คือเงินได้จากวิชาชีพอิสระ แพทย์ พยาบาล เภสัชกร ที่ประกอบโรคศิลปะ หักเหมา 60%">?</button></span>
+                  <span class="form-hint">หักเหมาอัตโนมัติ 60%</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="inc_40_6_medical" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="inc_40_6_other">
+                  <span>40(6) กฎหมาย วิศวกรรม บัญชี สถาปัตย์ ศิลปกรรม <button type="button" class="tip-btn" data-tip="วิชาชีพตามมาตรา 40(6) ที่ไม่ใช่ประกอบโรคศิลปะ เช่น ทนายความ วิศวกร สถาปนิก ผู้สอบบัญชี ศิลปิน หักเหมา 30%">?</button></span>
+                  <span class="form-hint">หักเหมาอัตโนมัติ 30%</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="inc_40_6_other" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="inc_40_7">
+                  <span>40(7) การรับเหมาจัดหาสัมภาระ <button type="button" class="tip-btn" data-tip="มาตรา 40(7) คือการรับเหมาที่ผู้รับเหมาต้องจัดหาสัมภาระสำคัญนอกจากเครื่องมือ เช่น รับเหมาก่อสร้างที่จัดหาวัสดุเอง หักเหมา 60%">?</button></span>
+                  <span class="form-hint">หักเหมาอัตโนมัติ 60%</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="inc_40_7" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="inc_40_8">
+                  <span>40(8) การพาณิชย์ ธุรกิจ ค้าขาย ขายของออนไลน์ <button type="button" class="tip-btn" data-tip="มาตรา 40(8) คือเงินได้อื่น ๆ จากธุรกิจ การพาณิชย์ ค้าขาย ร้านค้า ขายของออนไลน์ เกษตรกรรม ที่ไม่เข้า 40(1)-(7) หักเหมา 60%">?</button></span>
+                  <span class="form-hint">หักเหมาอัตโนมัติ 60%</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="inc_40_8" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-box" style="border-color: #FCD34D; background: #FFFDF5;">
+            <div class="card-header-bar">
+              <div class="card-title-group">
+                <div class="card-icon">🧾</div>
+                <div>
+                  <h3>ภาษีหัก ณ ที่จ่าย (Withholding Tax)</h3>
+                  <p>ภาษีที่ถูกหักไว้แล้วตลอดทั้งปีตามใบ 50 ทวิ</p>
+                </div>
+              </div>
+            </div>
+            <div class="form-group" style="max-width: 400px;">
+              <label class="form-label" for="withholding_tax">
+                <span>ภาษีที่ถูกหัก ณ ที่จ่ายไว้แล้วรวมทั้งปี</span>
+              </label>
+              <div class="input-wrapper">
+                <input type="number" id="withholding_tax" class="input-control" placeholder="0" min="0">
+                <span class="input-currency-suffix">บาท</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- [โหมดนิติบุคคล] รายได้และต้นทุนของกิจการ -->
+        <div id="corp-step1-fields" style="display:none;">
+          <div class="card-box">
+            <div class="card-header-bar">
+              <div class="card-title-group">
+                <div class="card-icon">📈</div>
+                <div>
+                  <h3>รายได้จากการดำเนินงานของนิติบุคคล (Corporate Revenue)</h3>
+                  <p>ยอดขายสินค้าและบริการในรอบระยะเวลาบัญชีตามประมวลรัษฎากร</p>
+                </div>
+              </div>
+            </div>
+            <div class="input-grid">
+              <div class="form-group">
+                <label class="form-label" for="corp_sales_revenue">
+                  <span>รายได้จากการขายสินค้าและให้บริการหลัก</span>
+                  <span class="form-hint">สำหรับพิจารณาเกณฑ์ SME (ไม่เกิน 30 ล้านบ.)</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="corp_sales_revenue" class="input-control" placeholder="0" min="0" step="1000">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="corp_other_revenue">
+                  <span>รายได้อื่น ๆ ของกิจการ</span>
+                  <span class="form-hint">ดอกเบี้ยรับ เงินปันผล กำไรจากอัตราแลกเปลี่ยน</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="corp_other_revenue" class="input-control" placeholder="0" min="0" step="1000">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-box">
+            <div class="card-header-bar">
+              <div class="card-title-group">
+                <div class="card-icon">📉</div>
+                <div>
+                  <h3>ต้นทุนและค่าใช้จ่ายในการดำเนินงาน (Expenses & Deductions)</h3>
+                  <p>ต้นทุนขาย ค่าใช้จ่ายบริหาร ค่าเสื่อมราคา เพื่อคำนวณกำไรสุทธิทางภาษี</p>
+                </div>
+              </div>
+            </div>
+            <div class="input-grid">
+              <div class="form-group">
+                <label class="form-label" for="corp_cogs">
+                  <span>ต้นทุนขายสินค้าและบริการ (COGS)</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="corp_cogs" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="corp_operating_expenses">
+                  <span>ค่าใช้จ่ายในการขายและบริหาร (SG&A)</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="corp_operating_expenses" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-box">
+            <div class="card-header-bar">
+              <div class="card-title-group">
+                <div class="card-icon">🔧</div>
+                <div>
+                  <h3>ค่าสึกหรอ / ค่าเสื่อมราคา (ตามประเภทสินทรัพย์)</h3>
+                  <p>แยกเครื่องจักรและคอมพิวเตอร์เพื่อสะท้อนเกณฑ์ภาษี (เครื่องจักรโดยทั่วไป 5 ปี, คอมพิวเตอร์ 3 ปี)</p>
+                </div>
+              </div>
+            </div>
+            <div class="input-grid">
+              <div class="form-group">
+                <label class="form-label" for="corp_dep_machinery">
+                  <span>ค่าเสื่อมราคาเครื่องจักร / โรงงาน</span>
+                  <span class="form-hint">ทางภาษีมักไม่เกิน 20% ต่อปี</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="corp_dep_machinery" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="corp_dep_computer">
+                  <span>ค่าเสื่อมราคาคอมพิวเตอร์ / ซอฟต์แวร์</span>
+                  <span class="form-hint">ทางภาษีมักไม่เกิน 33.33% ต่อปี</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="corp_dep_computer" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="corp_depreciation">
+                  <span>ค่าเสื่อมราคาและค่าตัดจำหน่ายอื่น</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="corp_depreciation" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="corp_special_deductions">
+                  <span>รายจ่ายสิทธิพิเศษ (วิจัย R&D / อบรม 200%)</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="corp_special_deductions" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-box">
+            <div class="card-header-bar">
+              <div class="card-title-group">
+                <div class="card-icon">⚖️</div>
+                <div>
+                  <h3>ปรับปรุงกำไรสุทธิทางภาษี (Tax Adjustment — ภ.ง.ด. 50/51)</h3>
+                  <p>บวกกลับรายจ่ายต้องห้ามตามมาตรา 65 ตรี และหักรายได้ที่ได้รับยกเว้นตามมาตรา 65 ทวิ</p>
+                </div>
+              </div>
+            </div>
+            <div class="input-grid">
+              <div class="form-group">
+                <label class="form-label" for="corp_addback">
+                  <span>รายจ่ายต้องห้าม มาตรา 65 ตรี (บวกกลับ)</span>
+                  <span class="form-hint">ค่ารับรองเกินเกณฑ์, เบี้ยปรับ, รายจ่ายส่วนตัว, สำรองที่ไม่เข้าเกณฑ์</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="corp_addback" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="corp_exempt_income">
+                  <span>รายได้ยกเว้นภาษี มาตรา 65 ทวิ (หักออก)</span>
+                  <span class="form-hint">เช่น เงินปันผลที่ได้รับยกเว้นตามเงื่อนไข</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="corp_exempt_income" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-box" style="border-color: #FCD34D; background: #FFFDF5;">
+            <div class="card-header-bar">
+              <div class="card-title-group">
+                <div class="card-icon">🧾</div>
+                <div>
+                  <h3>เครดิตภาษีที่ชำระไว้แล้ว (Tax Credits)</h3>
+                  <p>ภาษีหัก ณ ที่จ่ายที่นิติบุคคลถูกหักไว้ และภาษีเงินได้นิติบุคคลครึ่งปี (ภ.ง.ด. 51)</p>
+                </div>
+              </div>
+            </div>
+            <div class="input-grid">
+              <div class="form-group">
+                <label class="form-label" for="corp_wht_paid">
+                  <span>ภาษีเงินได้ถูกหัก ณ ที่จ่าย (ตามหนังสือรับรอง 50 ทวิ)</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="corp_wht_paid" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="corp_interim_tax">
+                  <span>ภาษีเงินได้นิติบุคคลครึ่งปีที่ชำระไว้แล้ว (ภ.ง.ด. 51)</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="corp_interim_tax" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="wizard-footer">
+          <div></div>
+          <button type="button" class="btn btn-primary btn-next-step" id="btn-next-step1">
+            ถัดไป: ไปยังค่าลดหย่อนภาษี ➔
+          </button>
+        </div>
+      </section>
+
+
+      <!-- ===================================================================
+           STEP 2: ค่าลดหย่อน (ALLOWANCES) / เกณฑ์ SME & สิทธิประโยชน์
+           =================================================================== -->
+      <section id="panel-step2" class="wizard-panel">
+
+        <!-- [โหมดบุคคลธรรมดา] ค่าลดหย่อน 4 หมวด + Thai ESG -->
+        <div id="ind-step2-fields">
+          <div class="card-box">
+            <div class="card-header-bar">
+              <div class="card-title-group">
+                <div class="card-icon">👨‍👩‍👧‍👦</div>
+                <div>
+                  <h3>หมวดที่ 1: ลดหย่อนส่วนตัวและครอบครัว</h3>
+                  <p>สิทธิลดหย่อนพื้นฐานสำหรับผู้มีเงินได้และสมาชิกในครอบครัว</p>
+                </div>
+              </div>
+            </div>
+            <div class="input-grid">
+              <div class="form-group">
+                <label class="form-label">
+                  <span>ผู้มีเงินได้ (ตนเอง)</span>
+                  <span class="tag-badge">60,000 บ. (อัตโนมัติ)</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="text" class="input-control" value="60,000" disabled style="background:#F1F5F9; font-weight:600;">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+
+              <div class="form-group" style="justify-content: center;">
+                <label class="form-label" style="cursor: pointer; display: flex; align-items: center; gap: 0.5rem; margin-top: 1.5rem;">
+                  <input type="checkbox" id="has_spouse_no_income" style="width: 18px; height: 18px; accent-color: var(--primary-color);">
+                  <span><strong>มีคู่สมรสที่ไม่มีเงินได้</strong> (ลดหย่อน 60,000 บ.)</span>
+                </label>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="child_before_2561">
+                  <span>บุตรชอบด้วยกฎหมาย / เกิดก่อนปี 2561</span>
+                  <span class="form-hint">คนละ 30,000 บาท</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="child_before_2561" class="input-control" placeholder="0" min="0" max="20">
+                  <span class="input-currency-suffix">คน</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="child_after_2561">
+                  <span>บุตรคนที่ 2 ขึ้นไปที่เกิดตั้งแต่ปี 2561</span>
+                  <span class="form-hint">คนละ 60,000 บาท</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="child_after_2561" class="input-control" placeholder="0" min="0" max="20">
+                  <span class="input-currency-suffix">คน</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="pregnancy_cost">
+                  <span>ค่าฝากครรภ์และค่าคลอดบุตร</span>
+                  <span class="form-hint">ตามจริง ไม่เกิน 60,000 บ./ปี</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="pregnancy_cost" class="input-control" placeholder="0" min="0" max="60000">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="parents_self_count">
+                  <span>อุปการะบิดามารดาตนเอง (อายุ 60+ รายได้ไม่เกิน 3 หมื่น)</span>
+                  <span class="form-hint">คนละ 30,000 บาท (สูงสุด 2 คน)</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="parents_self_count" class="input-control" placeholder="0" min="0" max="2">
+                  <span class="input-currency-suffix">คน</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="parents_spouse_count">
+                  <span>อุปการะบิดามารดาคู่สมรส (กรณีคู่สมรสไม่มีเงินได้)</span>
+                  <span class="form-hint">คนละ 30,000 บาท (สูงสุด 2 คน)</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="parents_spouse_count" class="input-control" placeholder="0" min="0" max="2">
+                  <span class="input-currency-suffix">คน</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="disabled_count">
+                  <span>อุปการะผู้พิการหรือทุพพลภาพ</span>
+                  <span class="form-hint">คนละ 60,000 บาท</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="disabled_count" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">คน</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-box">
+            <div class="card-header-bar">
+              <div class="card-title-group">
+                <div class="card-icon">🛡️</div>
+                <div>
+                  <h3>หมวดที่ 2: ประกัน เงินออม และกองทุนเพื่อการเกษียณ</h3>
+                  <p>เพดานกลุ่มเกษียณ 500k และ กองทุน Thai ESG เกณฑ์ใหม่แยกวงเงิน 300k</p>
+                </div>
+              </div>
+            </div>
+            <div class="input-grid">
+              <div class="form-group">
+                <label class="form-label" for="social_security">
+                  <span>เงินสมทบกองทุนประกันสังคม</span>
+                  <span class="form-hint">ตามจริง ไม่เกิน 9,000 บ.</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="social_security" class="input-control" placeholder="0" min="0" max="9000">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="life_insurance">
+                  <span>เบี้ยประกันชีวิตทั่วไป / เงินฝากสงเคราะห์ชีวิต</span>
+                  <span class="form-hint">สูงสุด 100,000 บ.</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="life_insurance" class="input-control" placeholder="0" min="0" max="100000">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="health_insurance">
+                  <span>เบี้ยประกันสุขภาพตนเอง</span>
+                  <span class="form-hint">สูงสุด 25,000 บ. (รวมประกันชีวิตไม่เกิน 1 แสน)</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="health_insurance" class="input-control" placeholder="0" min="0" max="25000">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="parent_health_insurance">
+                  <span>เบี้ยประกันสุขภาพบิดามารดา</span>
+                  <span class="form-hint">สูงสุด 15,000 บ.</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="parent_health_insurance" class="input-control" placeholder="0" min="0" max="15000">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+
+              <div style="grid-column: 1 / -1; background:#FEF9E7; padding:0.85rem; border-radius:var(--radius-md); border:1px solid #FDE68A;">
+                <strong style="color:#78350F; font-size:0.9rem;">📌 กองทุนเพื่อการเกษียณ (5 รายการนี้ รวมกันต้องไม่เกิน 500,000 บาท)</strong>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="provident_fund">
+                  <span>กองทุนสำรองเลี้ยงชีพ (PVD) / กบข.</span>
+                  <span class="form-hint">สูงสุด 15% ไม่เกิน 5 แสน</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="provident_fund" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="nsf">
+                  <span>กองทุนการออมแห่งชาติ (กอช.)</span>
+                  <span class="form-hint">สูงสุด 30,000 บ.</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="nsf" class="input-control" placeholder="0" min="0" max="30000">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="pension_insurance">
+                  <span>เบี้ยประกันชีวิตแบบบำนาญ</span>
+                  <span class="form-hint">สูงสุด 15% ไม่เกิน 2 แสน</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="pension_insurance" class="input-control" placeholder="0" min="0" max="200000">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="rmf">
+                  <span>กองทุน RMF (เพื่อการเลี้ยงชีพ)</span>
+                  <span class="form-hint">สูงสุด 30% ไม่เกิน 5 แสน</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="rmf" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="ssf">
+                  <span>กองทุน SSF (เพื่อการออม)</span>
+                  <span class="form-hint">สูงสุด 30% ไม่เกิน 2 แสน</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="ssf" class="input-control" placeholder="0" min="0" max="200000">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+
+              <div style="grid-column: 1 / -1; background:#ECFDF5; padding:0.85rem; border-radius:var(--radius-md); border:1px solid #A7F3D0;">
+                <strong style="color:#065F46; font-size:0.9rem;">🌿 กองทุนรวมไทยเพื่อความยั่งยืน (Thai ESG) - เกณฑ์ใหม่ล่าสุด 2567-2569</strong>
+                <p style="font-size:0.75rem; color:#047857;">สิทธิพิเศษแยกวงเงินต่างหาก! ไม่นับรวมในเพดานเกษียณ 500,000 บาท ลดหย่อนได้สูงสุด 30% ไม่เกิน 300,000 บาท</p>
+              </div>
+
+              <div class="form-group" style="grid-column: 1 / -1;">
+                <label class="form-label" for="thai_esg">
+                  <span>จำนวนเงินลงทุนในกองทุน Thai ESG</span>
+                  <span class="form-hint">สูงสุด 30% ไม่เกิน 300,000 บ.</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="thai_esg" class="input-control" placeholder="0" min="0" max="300000" style="border-color:#10B981;">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-box">
+            <div class="card-header-bar">
+              <div class="card-title-group">
+                <div class="card-icon">🏡</div>
+                <div>
+                  <h3>หมวดที่ 3: ดอกเบี้ยเงินกู้ยืมเพื่อที่อยู่อาศัย</h3>
+                  <p>แยกชัดเจนตามแบบ ภ.ง.ด. — ดอกเบี้ยบ้านตามจริง ไม่เกิน 100,000 บาทต่อปี</p>
+                </div>
+              </div>
+            </div>
+            <div class="input-grid">
+              <div class="form-group">
+                <label class="form-label" for="home_loan_interest">
+                  <span>ดอกเบี้ยเงินกู้ยืมเพื่อซื้อ/สร้างที่อยู่อาศัย</span>
+                  <span class="form-hint">ตามจริง ไม่เกิน 100,000 บ.</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="home_loan_interest" class="input-control" placeholder="0" min="0" max="100000">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="easy_e_receipt">
+                  <span>โครงการ Easy E-Receipt (ใบกำกับภาษี e-Tax)</span>
+                  <span class="form-hint">ตามจริง ไม่เกิน 50,000 บ.</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="easy_e_receipt" class="input-control" placeholder="0" min="0" max="50000">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-box">
+            <div class="card-header-bar">
+              <div class="card-title-group">
+                <div class="card-icon">🎗️</div>
+                <div>
+                  <h3>หมวดที่ 4: เงินบริจาค และ e-Donation (ลดหย่อน 2 เท่า)</h3>
+                  <p>บริจาคผ่านระบบ e-Donation เพื่อการศึกษา กีฬา โรงพยาบาลรัฐ ลดหย่อนได้ 2 เท่า ของจำนวนที่จ่ายจริง</p>
+                </div>
+              </div>
+            </div>
+            <div class="input-grid">
+              <div class="form-group">
+                <label class="form-label" for="donate_education_sports_hospital">
+                  <span>บริจาคผ่าน e-Donation (การศึกษา กีฬา รพ.รัฐ) × 2</span>
+                  <span class="form-hint">กรอกยอดจ่ายจริง ระบบคูณ 2 ให้อัตโนมัติ ไม่เกิน 10% ของเงินได้คงเหลือ</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="donate_education_sports_hospital" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="donate_general">
+                  <span>เงินบริจาคทั่วไป / มูลนิธิ (1 เท่า)</span>
+                  <span class="form-hint">ไม่เกิน 10% ของเงินได้คงเหลือ</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="donate_general" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- [โหมดนิติบุคคล] สิทธิประโยชน์ SME และเงินบริจาคนิติบุคคล -->
+        <div id="corp-step2-fields" style="display:none;">
+          <div class="card-box">
+            <div class="card-header-bar">
+              <div class="card-title-group">
+                <div class="card-icon">🏷️</div>
+                <div>
+                  <h3>การพิจารณาคุณสมบัติวิสาหกิจขนาดกลางและขนาดย่อม (SME)</h3>
+                  <p>นิติบุคคลที่เข้าเกณฑ์ SME จะได้รับสิทธิประโยชน์อัตราภาษีพิเศษ (0% สำหรับ 3 แสนแรก, 15% ช่วง 3 แสน - 3 ล้าน)</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="input-grid" style="margin-bottom:1rem;">
+              <div class="form-group">
+                <label class="form-label" for="corp_paid_up_capital">
+                  <span>ทุนจดทะเบียนที่ชำระแล้ว (บาท)</span>
+                  <span class="form-hint">ระบบเช็กอัตโนมัติ: ไม่เกิน 5,000,000 บาท จึงเข้าเกณฑ์ SME</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="corp_paid_up_capital" class="input-control" placeholder="5000000" min="0" step="1000">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="background:#FFFDF5; border:1px solid #FDE68A; border-radius:var(--radius-md); padding:1rem; margin-bottom:1.25rem;">
+              <label style="cursor:pointer; display:flex; align-items:flex-start; gap:0.75rem;">
+                <input type="checkbox" id="corp_capital_le_5m" checked style="width:20px; height:20px; accent-color:var(--primary-color); margin-top:2px;">
+                <div>
+                  <strong>เงื่อนไขที่ 1: ทุนจดทะเบียนชำระแล้ว ไม่เกิน 5 ล้านบาท</strong>
+                  <p style="font-size:0.8rem; color:var(--text-muted); margin-top:0.2rem;">
+                    ระบบติ๊กให้อัตโนมัติเมื่อกรอกทุนด้านบน — ตามพระราชกฤษฎีกาออกตามความในประมวลรัษฎากร
+                  </p>
+                </div>
+              </label>
+
+              <div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px dashed #FDE68A; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:0.85rem; color:#78350F;">เงื่อนไขที่ 2: รายได้จากการขายสินค้า/บริการ ไม่เกิน 30 ล้านบาท:</span>
+                <span id="corp-sme-sales-status" class="tag-badge">เข้าเกณฑ์</span>
+              </div>
+            </div>
+
+            <div id="corp-sme-decision-box" style="padding:0.85rem 1rem; border-radius:var(--radius-md); background:#ECFDF5; border:1px solid #A7F3D0; font-size:0.9rem; color:#065F46; font-weight:600;">
+              ✨ กิจการของคุณเข้าเกณฑ์ SME: เสียภาษีอัตราพิเศษ (กำไร 300,000 แรก ยกเว้น 0%, ช่วง 3 แสน - 3 ล้าน 15%)
+            </div>
+          </div>
+
+          <div class="card-box">
+            <div class="card-header-bar">
+              <div class="card-title-group">
+                <div class="card-icon">🎗️</div>
+                <div>
+                  <h3>เงินบริจาคของนิติบุคคล</h3>
+                  <p>หักได้ไม่เกิน 2% ของกำไรสุทธิเพื่อการศึกษา/กีฬา และไม่เกิน 2% เพื่อการกุศลสาธารณะ</p>
+                </div>
+              </div>
+            </div>
+            <div class="input-grid">
+              <div class="form-group">
+                <label class="form-label" for="corp_donate_edu">
+                  <span>เงินบริจาคเพื่อการศึกษา/กีฬา (หักได้ 2 เท่า แต่ไม่เกิน 2% ของกำไรสุทธิ)</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="corp_donate_edu" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="corp_donate_public">
+                  <span>เงินบริจาคการกุศลสาธารณะ/การสาธารณประโยชน์ (ไม่เกิน 2% ของกำไรสุทธิ)</span>
+                </label>
+                <div class="input-wrapper">
+                  <input type="number" id="corp_donate_public" class="input-control" placeholder="0" min="0">
+                  <span class="input-currency-suffix">บาท</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="wizard-footer">
+          <button type="button" class="btn btn-secondary btn-prev-step">
+            ← ย้อนกลับ: ข้อมูลรายได้
+          </button>
+          <button type="button" class="btn btn-primary btn-next-step" id="btn-next-step2">
+            ถัดไป: สรุปผลภาษี ➔
+          </button>
+        </div>
+      </section>
+
+      <!-- ===================================================================
+           STEP 3: สรุปผลภาษี (SUMMARY)
+           =================================================================== -->
+      <section id="panel-step3" class="wizard-panel">
+
+        <div class="card-box">
+          <div class="card-header-bar">
+            <div class="card-title-group">
+              <div class="card-icon">📊</div>
+              <div>
+                <h3>สรุปผลการคำนวณภาษีประจำปี</h3>
+                <p>ประเภท: <strong id="sum-taxpayer-type-label">บุคคลธรรมดา</strong> | วิธีการคำนวณ: <strong id="sum-selected-method">ขั้นบันได</strong> | เครดิตภาษีหักไว้: <strong id="sum-credits-amount">0 บาท</strong>
+                </p>
+              </div>
+            </div>
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+              <button id="btn-copy-summary" class="btn btn-secondary" type="button">
+                📋 คัดลอกสรุปยอด
+              </button>
+              <button id="btn-share-summary" class="btn btn-secondary" type="button">
+                📤 แชร์สรุป
+              </button>
+              <button id="btn-save-record-step3" class="btn btn-primary" type="button">
+                💾 บันทึกข้อมูลชุดนี้
+              </button>
+              <button id="btn-view-saved-step3" class="btn btn-secondary" type="button">
+                📂 ข้อมูลภาษีที่บันทึกไว้ของฉัน
+              </button>
+              <button id="btn-print-summary" class="btn btn-outline-gold" type="button">
+                🖨️ พิมพ์ / PDF ภ.ง.ด.
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- การ์ดสรุปผลยอดสุทธิ (ชำระเพิ่ม / คืนภาษี) -->
+        <div id="sum-final-card" class="final-tax-box" style="margin-bottom:1.5rem; padding:1.25rem; border-radius:var(--radius-md); border-left: 6px solid #64748B; background-color: #F8FAFC;">
+          <div id="sum-final-status" style="font-size:1.1rem; font-weight:700; color:#334155;">ไม่มีภาษีที่ต้องชำระเพิ่ม</div>
+          <div id="sum-final-amount" style="font-size:2rem; font-weight:800; color:#334155; margin:0.35rem 0;">0 บาท</div>
+        </div>
+        <div class="step4-grid">
+          <div class="stat-card">
+            <span class="sc-label" id="lbl-sum-col1">1. เงินได้พึงประเมินรวม</span>
+            <div class="sc-value" id="sum-total-income">0 บาท</div>
+          </div>
+          <div class="stat-card">
+            <span class="sc-label" id="lbl-sum-col2">2. หักค่าใช้จ่ายรวม (อัตโนมัติ)</span>
+            <div class="sc-value" id="sum-total-expense" style="color:#DC2626;">0 บาท</div>
+          </div>
+          <div class="stat-card">
+            <span class="sc-label" id="lbl-sum-col3">3. หักค่าลดหย่อน / เงินบริจาค</span>
+            <div class="sc-value" id="sum-total-allowance" style="color:#DC2626;">0 บาท</div>
+          </div>
+          <div class="stat-card">
+            <span class="sc-label" id="lbl-sum-col4">4. เงินได้สุทธิ / กำไรสุทธิ</span>
+            <div class="sc-value" id="sum-net-income" style="color:#D97706;">0 บาท</div>
+          </div>
+        </div>
+
+        <!-- Smart Tax Saver + Before vs After (บุคคลธรรมดา) -->
+        <div class="card-box" id="tax-optimizer-box">
+          <div class="card-header-bar">
+            <div class="card-title-group">
+              <div class="card-icon">💡</div>
+              <div>
+                <h3>แผนประหยัดภาษีอัจฉริยะ (Smart Tax Saver)</h3>
+                <p>ประเมินสิทธิที่ยังซื้อกองทุน/ประกันเพิ่มได้ตามเพดานสูงสุด และเปรียบเทียบภาษีก่อน-หลัง</p>
+              </div>
+            </div>
+          </div>
+          <p id="optimizer-marginal" class="optimizer-meta">ฐานภาษีสูงสุดปัจจุบัน: —</p>
+          <div id="optimizer-suggestions" class="saver-grid"></div>
+
+          <div class="compare-simulator">
+            <h4>เครื่องมือเปรียบเทียบ Before vs After</h4>
+            <p class="form-hint" style="margin-bottom:0.75rem;">จำลองว่าถ้าซื้อกองทุน/ประกันเพิ่มอีกเท่าไร จะประหยัดภาษีได้กี่บาท และ ROI กี่ %</p>
+            <div class="simulator-controls">
+              <label class="form-label" for="sim-category">ประเภทที่ซื้อเพิ่ม</label>
+              <select id="sim-category" class="input-control">
+                <option value="auto_smart">กระจายอัตโนมัติ (Thai ESG → RMF → ประกัน)</option>
+                <option value="thai_esg">Thai ESG</option>
+                <option value="rmf">RMF</option>
+                <option value="ssf">SSF</option>
+                <option value="life_insurance">ประกันชีวิต</option>
+                <option value="home_loan_interest">ดอกเบี้ยบ้าน</option>
+              </select>
+              <label class="form-label" for="sim-amount">จำนวนเงินที่ซื้อเพิ่ม (บาท)</label>
+              <input type="number" id="sim-amount" class="input-control" min="0" step="1000" placeholder="เช่น 50000" value="30000">
+              <button type="button" class="btn btn-primary" id="btn-run-simulator">จำลองผล</button>
+            </div>
+            <div id="compare-bars" class="compare-bars" hidden>
+              <div class="bar-col">
+                <span class="bar-label">ถ้าไม่ลดหย่อนเพิ่ม</span>
+                <div class="bar-track"><div class="bar-fill before" id="bar-before"></div></div>
+                <strong id="compare-before-tax">0 บาท</strong>
+              </div>
+              <div class="bar-col">
+                <span class="bar-label">ถ้าซื้อเพิ่มตามที่จำลอง</span>
+                <div class="bar-track"><div class="bar-fill after" id="bar-after"></div></div>
+                <strong id="compare-after-tax">0 บาท</strong>
+              </div>
+            </div>
+            <div id="compare-result" class="compare-result" hidden></div>
+          </div>
+        </div>
+
+        <div class="card-box" id="corp-sme-savings-box" style="display:none;">
+          <div class="card-header-bar">
+            <div class="card-title-group">
+              <div class="card-icon">🏷️</div>
+              <div>
+                <h3>สิทธิยกเว้นภาษี SME (0% / 15% / 20%)</h3>
+                <p>ระบบตรวจทุนจดทะเบียนชำระแล้ว ≤ 5 ล้าน และรายได้ ≤ 30 ล้านบาทให้อัตโนมัติ</p>
+              </div>
+            </div>
+          </div>
+          <div id="corp-sme-savings-body"></div>
+        </div>
+        <div class="card-box" id="auto-expense-summary-box">
+          <div class="card-header-bar">
+            <div class="card-title-group">
+              <div class="card-icon">⚡</div>
+              <div>
+                <h3>การหักค่าใช้จ่ายอัตโนมัติตามเกณฑ์พระราชกฤษฎีกา</h3>
+                <p>ระบบคำนวณหักเหมาตามกฎหมายให้อัตโนมัติโดยผู้ใช้ไม่ต้องกรอกเอง</p>
+              </div>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="tax-table">
+              <thead>
+                <tr>
+                  <th>ประเภทเงินได้</th>
+                  <th>เกณฑ์การหักค่าใช้จ่ายตามกฎหมาย</th>
+                  <th style="text-align:right;">เงินได้</th>
+                  <th style="text-align:right;">ค่าใช้จ่ายที่หักได้</th>
+                </tr>
+              </thead>
+              <tbody id="ind-expense-breakdown-body">
+                <!-- ข้อมูลแทรกด้วย JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ตารางแจกแจงอัตราภาษี -->
+        <div class="card-box">
+          <div class="card-header-bar">
+            <div class="card-title-group">
+              <div class="card-icon">📊</div>
+              <div>
+                <h3 id="bracket-table-title">ตารางแจกแจงการคำนวณภาษีตามอัตรากฎหมาย</h3>
+                <p id="bracket-table-desc">แสดงการคำนวณภาษีแต่ละขั้น</p>
+              </div>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="tax-table">
+              <thead>
+                <tr>
+                  <th id="th-bracket-range">ช่วงเงินได้สุทธิ / กำไรสุทธิ</th>
+                  <th style="text-align:center;">อัตราภาษี</th>
+                  <th style="text-align:right;">ฐานภาษีในขั้น</th>
+                  <th style="text-align:right;">ภาษีที่ต้องเสียในขั้น</th>
+                </tr>
+              </thead>
+              <tbody id="bracket-table-body">
+                <!-- ข้อมูลขั้นบันไดจะแสดงด้วย JS -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- แบนเนอร์เปรียบเทียบวิธีเหมา (สำหรับบุคคลธรรมดา) -->
+          <div class="method-compare-banner" id="ind-method2-compare-box">
+            <div style="font-size:1.3rem;">⚖️</div>
+            <div>
+              <strong>การเปรียบเทียบภาษีวิธีที่ 2 (ภาษีเหมา 0.5% สำหรับบุคคลธรรมดาที่มี 40(2)-(8)):</strong>
+              <div style="margin-top:0.25rem;">
+                ภาษีวิธีที่ 1 (ขั้นบันได): <strong id="sum-method1-tax">0 บาท</strong> | ภาษีวิธีที่ 2 (เหมา 0.5%): <strong id="sum-method2-tax">0 บาท</strong>
+              </div>
+              <p style="font-size:0.75rem; color:#78350F; margin-top:0.2rem;">
+                *หากมีเงินได้ 40(2)-(8) ตั้งแต่ 120,000 บ. ขึ้นไป และภาษีเหมาเกิน 5,000 บ. กฎหมายให้เสียภาษีตามยอดที่สูงกว่า
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="wizard-footer">
+          <button type="button" class="btn btn-secondary btn-prev-step">
+            ⬅ ย้อนกลับ: แก้ไขค่าลดหย่อน
+          </button>
+          <button type="button" class="btn btn-outline-gold" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
+            ⬆ กลับไปด้านบน
+          </button>
+        </div>
+      </section>
+
+    </div>
+
+
+    <!-- คอลัมน์ขวา: Sticky Live Summary Bar ด้านข้าง -->
+    <aside class="sticky-summary-sidebar no-print">
+      <div class="live-summary-card">
+        <div class="summary-header">
+          <h3 id="side-card-title">สรุปภาษีแบบเรียลไทม์</h3>
+          <span class="tag-badge" id="side-tag-badge">บุคคลธรรมดา</span>
+        </div>
+
+        <div class="summary-body">
+          <div class="summary-row">
+            <span class="label" id="side-lbl-income">เงินได้รวม:</span>
+            <span class="value" id="side-total-income">0</span>
+          </div>
+          <div class="summary-row deduct">
+            <span class="label" id="side-lbl-expense">หักค่าใช้จ่าย (เหมาอัตโนมัติ):</span>
+            <span class="value" id="side-total-expense">-0</span>
+          </div>
+          <div class="summary-row deduct">
+            <span class="label" id="side-lbl-allowance">หักลดหย่อน:</span>
+            <span class="value" id="side-total-allowance">-0</span>
+          </div>
+
+          <div class="summary-highlight">
+            <div class="hl-title" id="side-lbl-net">เงินได้สุทธิ (Net Income)</div>
+            <div class="hl-amount" id="side-net-taxable">0</div>
+            <div class="hl-sub">อัตราภาษีเฉลี่ย: <strong id="side-effective-rate">0%</strong></div>
+          </div>
+
+          <!-- กล่องสรุปผลภาษี (ชำระเพิ่ม / ขอคืน / 0) -->
+          <div class="final-tax-box zero" id="side-final-box">
+            <div class="status-text" id="side-tax-status">ไม่ต้องชำระภาษีเพิ่ม</div>
+            <div class="tax-amount" id="side-tax-amount">0 บาท</div>
+            <div style="font-size:0.75rem;" id="side-tax-sub">เงินได้สุทธิไม่เกินเกณฑ์ยกเว้นภาษี</div>
+          </div>
+
+          <div class="summary-actions" style="display:flex; flex-direction:column; gap:0.4rem;">
+            <button id="btn-calculate-now" class="btn btn-primary" type="button" style="width:100%;">
+              ⚡ คำนวณภาษีทันที
+            </button>
+            <button id="btn-save-record" class="btn btn-secondary" type="button" style="width:100%;">
+              💾 บันทึกข้อมูลภาษีชุดนี้
+            </button>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+  </main>
+
+
+  <!-- =======================================================================
+       MODAL 1: เข้าสู่ระบบ / สมัครสมาชิก
+       ======================================================================= -->
+  <div class="modal-backdrop" id="modal-auth">
+    <div class="modal-box auth-modal-box">
+      <button class="modal-close-btn auth-close-btn" aria-label="ปิด">✕</button>
+
+      <!-- Auth Modal Header with Logo -->
+      <div class="auth-modal-header">
+        <div class="auth-modal-logo">🏛️</div>
+        <h3>TAX PORTAL</h3>
+        <p>ระบบบริการภาษีเงินได้ออนไลน์</p>
+      </div>
+
+      <!-- Tab Switcher -->
+      <div class="auth-tabs-modern">
+        <button class="auth-tab-btn-modern active" id="tab-login-btn">
+          <span class="auth-tab-icon">🔑</span>
+          <span>เข้าสู่ระบบ</span>
+        </button>
+        <button class="auth-tab-btn-modern" id="tab-register-btn">
+          <span class="auth-tab-icon">📝</span>
+          <span>สมัครสมาชิก</span>
+        </button>
+        <span class="auth-tab-indicator" id="auth-tab-indicator"></span>
+      </div>
+
+      <div class="auth-modal-body">
+        <!-- ฟอร์มเข้าสู่ระบบ -->
+        <form id="form-login" novalidate>
+          <div class="auth-form-group">
+            <label class="auth-label" for="login-email">
+              <span class="auth-label-icon">📧</span> อีเมล หรือ ชื่อผู้ใช้ (Email / Username)
+            </label>
+            <input type="text" id="login-email" class="auth-input"
+              placeholder="กรอกอีเมล หรือ ชื่อผู้ใช้" autocomplete="username" required>
+          </div>
+          <div class="auth-form-group">
+            <label class="auth-label" for="login-password">
+              <span class="auth-label-icon">🔒</span> รหัสผ่าน (Password)
+            </label>
+            <div class="auth-input-wrapper">
+              <input type="password" id="login-password" class="auth-input"
+                placeholder="กรอกรหัสผ่าน" autocomplete="current-password">
+              <button type="button" class="auth-pwd-toggle" id="toggle-login-pwd" aria-label="แสดง/ซ่อนรหัสผ่าน">👁️</button>
+            </div>
+          </div>
+          <span class="auth-field-error" id="err-login" style="margin-bottom:0.5rem; display:block;"></span>
+          <button type="submit" class="auth-submit-btn">
+            เข้าสู่ระบบ <span>→</span>
+          </button>
+          <div style="text-align:center; margin-top:0.75rem;">
+            <a href="#" id="btn-forgot-password" style="color:var(--primary-color); font-size:0.85rem; text-decoration:none; cursor:pointer;">🔑 ลืมรหัสผ่าน?</a>
+          </div>
+        </form>
+
+        <!-- ฟอร์มลืมรหัสผ่าน -->
+        <form id="form-forgot-password" style="display:none;" novalidate>
+          <div style="text-align:center; margin-bottom:1rem;">
+            <div style="font-size:2.5rem; margin-bottom:0.5rem;">🔐</div>
+            <h4 style="margin:0 0 0.3rem 0; color:var(--text-color);">ลืมรหัสผ่าน</h4>
+            <p style="font-size:0.82rem; color:var(--text-muted); margin:0;">กรอกอีเมลที่สมัครไว้ ระบบจะส่งลิงก์รีเซ็ตรหัสผ่านไปให้ทางอีเมล</p>
+          </div>
+          <div class="auth-form-group">
+            <label class="auth-label" for="forgot-email">
+              <span class="auth-label-icon">📧</span> อีเมลที่ลงทะเบียน <span class="auth-required">*</span>
+            </label>
+            <input type="email" id="forgot-email" class="auth-input" autocomplete="email"
+              placeholder="your@email.com" required>
+            <span class="auth-field-error" id="err-forgot-email"></span>
+          </div>
+          <span class="auth-field-error" id="err-forgot" style="margin-bottom:0.5rem; display:block;"></span>
+          <div id="forgot-success-msg" style="display:none; padding:0.75rem; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:8px; margin-bottom:0.75rem; font-size:0.85rem; color:#065F46; text-align:center;">
+            ✅ ส่งลิงก์รีเซ็ตรหัสผ่านไปที่อีเมลของท่านแล้ว กรุณาตรวจสอบกล่องจดหมาย (Inbox / Spam)
+          </div>
+          <button type="submit" class="auth-submit-btn" id="btn-forgot-submit">
+            📧 ส่งลิงก์รีเซ็ตรหัสผ่าน
+          </button>
+          <div style="text-align:center; margin-top:0.75rem;">
+            <a href="#" id="btn-back-to-login" style="color:var(--primary-color); font-size:0.85rem; text-decoration:none; cursor:pointer;">← กลับไปหน้าเข้าสู่ระบบ</a>
+          </div>
+        </form>
+
+        <!-- ฟอร์มสมัครสมาชิก -->
+        <form id="form-register" style="display:none;" novalidate>
+          <div class="auth-form-group">
+            <label class="auth-label" for="reg-email">
+              <span class="auth-label-icon">📧</span> อีเมล (Email) <span class="auth-required">*</span>
+            </label>
+            <input type="email" id="reg-email" class="auth-input" autocomplete="email"
+              placeholder="your@email.com" required>
+            <span class="auth-field-error" id="err-reg-email"></span>
+          </div>
+
+          <div class="auth-form-group">
+            <label class="auth-label" for="reg-fullname">
+              <span class="auth-label-icon">🪪</span> ชื่อ-นามสกุล / ชื่อกิจการ <span class="auth-required">*</span>
+            </label>
+            <input type="text" id="reg-fullname" class="auth-input" autocomplete="name"
+              placeholder="เช่น นายสมชาย ใจดี">
+            <span class="auth-field-error" id="err-reg-fullname"></span>
+          </div>
+
+          <div class="auth-form-group">
+            <label class="auth-label" for="reg-password">
+              <span class="auth-label-icon">🔒</span> กำหนดรหัสผ่าน <span class="auth-required">*</span>
+            </label>
+            <div class="auth-input-wrapper">
+              <input type="password" id="reg-password" class="auth-input" autocomplete="new-password"
+                placeholder="อย่างน้อย 6 ตัวอักษร">
+              <button type="button" class="auth-pwd-toggle" id="toggle-reg-pwd" aria-label="แสดง/ซ่อนรหัสผ่าน">👁️</button>
+            </div>
+            <span class="auth-field-error" id="err-reg-password"></span>
+          </div>
+
+          <div class="auth-form-group">
+            <label class="auth-label" for="reg-taxid">
+              <span class="auth-label-icon">🔢</span> เลขประจำตัวผู้เสียภาษี <span class="auth-optional">(ไม่บังคับ)</span>
+            </label>
+            <input type="text" id="reg-taxid" class="auth-input" inputmode="numeric"
+              placeholder="13 หลัก" maxlength="13">
+            <span class="auth-field-error" id="err-reg-taxid"></span>
+          </div>
+
+          <button type="submit" class="auth-submit-btn auth-submit-register" id="btn-register-submit">
+            <span id="btn-register-text">สมัครสมาชิกใหม่</span>
+            <span id="btn-register-spinner" style="display:none;">⏳ กำลังดำเนินการ...</span>
+            <span>→</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- =======================================================================
+       MODAL 2: หน้าตั้งค่าโปรไฟล์และระบุตัวตนสมาชิก (Member Settings & Profile)
+       ======================================================================= -->
+  <div class="modal-backdrop" id="modal-profile-settings">
+    <div class="modal-box" style="max-width: 620px;">
+      <div class="modal-header">
+        <h3>⚙️ ตั้งค่าโปรไฟล์และข้อมูลระบุตัวตน</h3>
+        <button class="modal-close-btn" aria-label="ปิด">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="form-profile-settings">
+          <!-- เปลี่ยนรูปโปรไฟล์ -->
+          <div class="profile-pic-section">
+            <div class="profile-pic-preview" id="profile-pic-preview">
+              <span id="profile-pic-text">👤</span>
+            </div>
+            <div style="flex: 1;">
+              <strong style="color:#78350F; font-size:0.9rem;">รูปโปรไฟล์ของคุณ</strong>
+              <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.4rem;">
+                อัปโหลดรูปภาพของตนเอง หรือเลือกรูป Avatar สำเร็จรูป
+              </p>
+              <div style="display:flex; gap:0.5rem; align-items:center;">
+                <label class="btn btn-secondary btn-sm" style="cursor:pointer;">
+                  📁 อัปโหลดรูปภาพ
+                  <input type="file" id="profile-pic-upload" accept="image/*" style="display:none;">
+                </label>
+                <button type="button" class="btn btn-outline-gold btn-sm" id="btn-remove-pic">ลบรูป</button>
+              </div>
+              <div class="avatar-presets-group">
+                <button type="button" class="avatar-preset-btn" data-avatar="👨‍💼">👨‍💼</button>
+                <button type="button" class="avatar-preset-btn" data-avatar="👩‍💼">👩‍💼</button>
+                <button type="button" class="avatar-preset-btn" data-avatar="🧑‍💻">🧑‍💻</button>
+                <button type="button" class="avatar-preset-btn" data-avatar="🩺">🩺</button>
+                <button type="button" class="avatar-preset-btn" data-avatar="🏢">🏢</button>
+                <button type="button" class="avatar-preset-btn" data-avatar="🏛️">🏛️</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ข้อมูลระบุตัวตน -->
+          <div class="input-grid">
+            <div class="form-group">
+              <label class="form-label" for="profile-fullname">ชื่อ-นามสกุล / ชื่อกิจการ *</label>
+              <input type="text" id="profile-fullname" class="input-control" required placeholder="ชื่อ-นามสกุล">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="profile-taxid">เลขประจำตัวผู้เสียภาษี (13 หลัก)</label>
+              <input type="text" id="profile-taxid" class="input-control" placeholder="1234567890123" maxlength="13">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="profile-email">อีเมล</label>
+              <input type="email" id="profile-email" class="input-control" placeholder="your@email.com">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="profile-phone">เบอร์โทรศัพท์</label>
+              <input type="tel" id="profile-phone" class="input-control" placeholder="08x-xxx-xxxx">
+            </div>
+
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label class="form-label" for="profile-company">ชื่อสถานประกอบการ / บริษัท (กรณีเป็นนิติบุคคลหรือร้านค้า)</label>
+              <input type="text" id="profile-company" class="input-control" placeholder="บริษัท ตัวอย่าง จำกัด">
+            </div>
+
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label class="form-label" for="profile-address">ที่อยู่สำหรับออกเอกสารและแบบแสดงรายการภาษี</label>
+              <textarea id="profile-address" class="input-control" rows="2" placeholder="ที่อยู่ เลขที่ ถนน ตำบล/แขวง อำเภอ/เขต จังหวัด"></textarea>
+            </div>
+          </div>
+
+          <div style="margin-top:1.25rem; display:flex; justify-content:flex-end; gap:0.6rem;">
+            <button type="button" class="btn btn-secondary modal-close-btn">ยกเลิก</button>
+            <button type="submit" class="btn btn-primary">💾 บันทึกข้อมูลโปรไฟล์</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- =======================================================================
+       MODAL 3: แดชบอร์ดผู้ดูแลระบบ / เจ้าของเว็บไซต์ (Admin Portal)
+       ======================================================================= -->
+  <div class="modal-backdrop" id="modal-admin-portal">
+    <div class="modal-box admin-modal-box">
+      <div class="modal-header" style="background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); color:#FFF;">
+        <h3 style="color:#FFF; display:flex; align-items:center; gap:0.5rem;">
+          <span>🛡️ แดชบอร์ดผู้ดูแลระบบ (Admin Portal)</span>
+          <span class="tag-badge" style="background:#F59E0B; color:#000;">เจ้าของเว็บไซต์</span>
+        </h3>
+        <button class="modal-close-btn" style="color:#FFF;" aria-label="ปิด">✕</button>
+      </div>
+      <div class="admin-modal-body">
+
+        <!-- แท็บสถิติภาพรวม KPIs -->
+        <div class="admin-kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+          <div class="admin-kpi-card">
+            <div class="kpi-val" id="admin-kpi-users">0</div>
+            <div class="kpi-lbl">👥 สมาชิกทั้งหมดในระบบ</div>
+          </div>
+          <div class="admin-kpi-card">
+            <div class="kpi-val" id="admin-kpi-records">0</div>
+            <div class="kpi-lbl">📋 แบบภาษีที่บันทึกไว้</div>
+          </div>
+          <div class="admin-kpi-card">
+            <div class="kpi-val" id="admin-kpi-tax" style="color:#059669;">฿ 0</div>
+            <div class="kpi-lbl">💰 ภาษีคำนวณได้รวมทั้งระบบ</div>
+          </div>
+          <div class="admin-kpi-card">
+            <div class="kpi-val" id="admin-kpi-income" style="color:#2563EB;">฿ 0</div>
+            <div class="kpi-lbl">💵 รายได้/ยอดขายสะสมรวม</div>
+          </div>
+          <div class="admin-kpi-card">
+            <div class="kpi-val" id="admin-kpi-ind-corp">0 / 0</div>
+            <div class="kpi-lbl">บุคคลธรรมดา / นิติบุคคล</div>
+          </div>
+          <div class="admin-kpi-card">
+            <div class="kpi-val" id="admin-kpi-tickets" style="color:#D97706;">0</div>
+            <div class="kpi-lbl">🎫 Ticket รอการแก้ไข</div>
+          </div>
+        </div>
+
+        <div class="admin-tabs">
+          <button type="button" class="admin-tab-btn active" data-admin-tab="summary">📊 สรุปผลภาพรวมข้อมูลทั้งหมด</button>
+          <button type="button" class="admin-tab-btn" data-admin-tab="all-records">📋 แบบภาษีทั้งหมดในระบบ</button>
+          <button type="button" class="admin-tab-btn" data-admin-tab="members">👥 รายชื่อสมาชิก</button>
+          <button type="button" class="admin-tab-btn" data-admin-tab="tickets">🎫 จัดการข้อร้องเรียน/สอบถาม</button>
+        </div>
+
+        <!-- 1. แท็บสรุปผลภาพรวมข้อมูลทั้งหมด (Executive Data Summary) -->
+        <div id="admin-tab-summary">
+          <div class="card-box" style="margin-bottom:1rem; padding:1.25rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; margin-bottom:1rem; border-bottom:1px solid #E2E8F0; padding-bottom:0.75rem;">
+              <div>
+                <h4 style="font-size:1.1rem; color:#0F172A; margin:0 0 0.2rem 0; display:flex; align-items:center; gap:0.5rem;">
+                  <span>📈</span> <span>รายงานสรุปผลข้อมูลภาษีและสถิติภาพรวม</span>
+                </h4>
+                <p style="font-size:0.8rem; color:var(--text-muted); margin:0;">วิเคราะห์ข้อมูลทางการเงิน ยอดภาษี และพฤติกรรมการลดหย่อนภาษีของสมาชิกทุกคนในระบบ</p>
+              </div>
+              <div style="display:flex; gap:0.5rem;">
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-admin-refresh">🔄 รีเฟรชข้อมูล</button>
+                <button type="button" class="btn btn-primary btn-sm" id="btn-admin-print-summary">🖨️ พิมพ์รายงานสรุป</button>
+              </div>
+            </div>
+
+            <!-- Financial Summary Cards -->
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:1rem; margin-bottom:1.5rem;">
+              <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:1rem;">
+                <div style="font-size:0.8rem; color:#64748B; font-weight:600;">ภาษีบุคคลธรรมดารวม (ภ.ง.ด. 90/91)</div>
+                <div style="font-size:1.35rem; font-weight:700; color:#0F172A; margin:0.35rem 0;" id="admin-sum-ind-tax">฿ 0</div>
+                <div style="font-size:0.75rem; color:#64748B;" id="admin-sum-ind-count">0 รายการ</div>
+              </div>
+              <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:1rem;">
+                <div style="font-size:0.8rem; color:#64748B; font-weight:600;">ภาษีนิติบุคคลรวม (ภ.ง.ด. 50)</div>
+                <div style="font-size:1.35rem; font-weight:700; color:#0F172A; margin:0.35rem 0;" id="admin-sum-corp-tax">฿ 0</div>
+                <div style="font-size:0.75rem; color:#64748B;" id="admin-sum-corp-count">0 บริษัท</div>
+              </div>
+              <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:1rem;">
+                <div style="font-size:0.8rem; color:#64748B; font-weight:600;">ยอดลดหย่อนภาษีรวมทั้งหมด</div>
+                <div style="font-size:1.35rem; font-weight:700; color:#2563EB; margin:0.35rem 0;" id="admin-sum-allowances">฿ 0</div>
+                <div style="font-size:0.75rem; color:#64748B;">การประหยัดภาษีของสมาชิก</div>
+              </div>
+              <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:1rem;">
+                <div style="font-size:0.8rem; color:#64748B; font-weight:600;">อัตราเฉลี่ยภาษีต่อแบบ (Avg Tax)</div>
+                <div style="font-size:1.35rem; font-weight:700; color:#D97706; margin:0.35rem 0;" id="admin-sum-avg-tax">฿ 0</div>
+                <div style="font-size:0.75rem; color:#64748B;">เฉลี่ยต่อผู้ยื่น</div>
+              </div>
+            </div>
+
+            <!-- Top Deductions Used Breakdown -->
+            <h5 style="font-size:0.95rem; color:#0F172A; margin:0 0 0.75rem 0; display:flex; align-items:center; gap:0.4rem;">
+              <span>🏆</span> <span>สัดส่วนสิทธิลดหย่อนภาษียอดนิยมที่สมาชิกใช้</span>
+            </h5>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:0.75rem; margin-bottom:1.5rem;" id="admin-deductions-breakdown">
+              <!-- populated by JS -->
+            </div>
+
+            <!-- Recent Filings Preview -->
+            <h5 style="font-size:0.95rem; color:#0F172A; margin:0 0 0.75rem 0; display:flex; align-items:center; gap:0.4rem;">
+              <span>🕒</span> <span>แบบคำนวณภาษีล่าสุดในระบบ</span>
+            </h5>
+            <div class="table-responsive">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>ชื่อแบบภาษี</th>
+                    <th>ผู้ยื่น</th>
+                    <th>ประเภท</th>
+                    <th>ปีภาษี</th>
+                    <th style="text-align:right;">รายได้/ยอดขาย</th>
+                    <th style="text-align:right;">ภาษีที่คำนวณได้</th>
+                    <th>วันที่</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-recent-filings-tbody">
+                  <!-- populated by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div><!-- /admin-tab-summary -->
+
+        <!-- 2. แท็บแบบภาษีทั้งหมดในระบบ (All Tax Records) -->
+        <div id="admin-tab-all-records" style="display:none;">
+          <div class="card-box" style="margin-bottom:0; padding:1.25rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; margin-bottom:1rem;">
+              <div>
+                <h4 style="font-size:1.05rem; color:#0F172A; margin:0 0 0.2rem 0;">📋 รายการแบบภาษีทั้งหมดของสมาชิก (All Tax Filings)</h4>
+                <p style="font-size:0.8rem; color:var(--text-muted); margin:0;">เรียกดู ตรวจสอบข้อมูลคำนวณภาษี และพิมพ์รายงานของสมาชิกแต่ละท่าน</p>
+              </div>
+              <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                <input type="text" id="admin-records-search" class="input-control" placeholder="ค้นหาชื่อแบบ, ชื่อสมาชิก, ปี..." style="width:240px; padding:0.4rem 0.75rem;">
+                <select id="admin-records-filter-type" class="input-control" style="width:140px; padding:0.4rem 0.75rem;">
+                  <option value="all">ทุกประเภท</option>
+                  <option value="individual">บุคคลธรรมดา</option>
+                  <option value="corporate">นิติบุคคล</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>แบบภาษี</th>
+                    <th>สมาชิกผู้ยื่น</th>
+                    <th>ประเภท</th>
+                    <th>ปีภาษี</th>
+                    <th style="text-align:right;">รายได้ / ยอดขาย</th>
+                    <th style="text-align:right;">ภาษีสุทธิ</th>
+                    <th>วันที่บันทึก</th>
+                    <th style="text-align:right;">การกระทำ</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-all-records-tbody">
+                  <!-- populated by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div><!-- /admin-tab-all-records -->
+
+        <div id="admin-tab-members" style="display:none;">
+
+        <!-- แถบค้นหาและจัดการสมาชิก -->
+        <div class="card-box" style="margin-bottom:0; padding:1.25rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; margin-bottom:1rem;">
+            <div>
+              <h4 style="font-size:1.05rem; color:#78350F;">👥 รายชื่อสมาชิกทั้งหมดในระบบ (Member Directory)</h4>
+              <p style="font-size:0.8rem; color:var(--text-muted);">สามารถค้นหา ดูข้อมูลระบุตัวตน และตรวจสอบข้อมูลการคำนวณภาษีของสมาชิกแต่ละคนได้</p>
+            </div>
+            <div style="display:flex; gap:0.5rem;">
+              <input type="text" id="admin-search-input" class="input-control" placeholder="ค้นหาชื่อ, username, เลขภาษี..." style="width:260px; padding:0.4rem 0.75rem;">
+              <button class="btn btn-secondary btn-sm" id="btn-admin-search">🔍 ค้นหา</button>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>สมาชิก</th>
+                  <th>ชื่อผู้ใช้ (Username)</th>
+                  <th>เลขประจำตัวผู้เสียภาษี</th>
+                  <th>บทบาท</th>
+                  <th>วันที่สมัคร</th>
+                  <th>แบบภาษี</th>
+                  <th style="text-align:right;">การกระทำ</th>
+                </tr>
+              </thead>
+              <tbody id="admin-members-tbody">
+                <!-- รายชื่อสมาชิกจะแสดงด้วย JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        </div><!-- /admin-tab-members -->
+
+        <div id="admin-tab-tickets" style="display:none;">
+          <div class="card-box" style="margin-bottom:0; padding:1.25rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; margin-bottom:0.75rem;">
+              <div>
+                <h4 style="font-size:1.05rem; color:#78350F;">🎫 จัดการข้อร้องเรียน / สอบถาม (Support Tickets)</h4>
+                <p style="font-size:0.8rem; color:var(--text-muted);">ดูสถานะ ตอบกลับ และเปลี่ยนสถานะข้อร้องเรียนของผู้ใช้</p>
+              </div>
+              <select id="admin-ticket-filter" class="input-control" style="width:180px; padding:0.4rem 0.75rem;">
+                <option value="all">ทุกสถานะ</option>
+                <option value="pending">รอการแก้ไข</option>
+                <option value="in_progress">กำลังดำเนินการ</option>
+                <option value="resolved">แก้ไขแล้ว</option>
+              </select>
+            </div>
+
+            <!-- Count summary badges -->
+            <div id="admin-ticket-count-summary" style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem;"></div>
+
+            <div class="table-responsive">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>ผู้ส่ง</th>
+                    <th>ประเภท</th>
+                    <th>ข้อความ</th>
+                    <th>สถานะ</th>
+                    <th>วันที่</th>
+                    <th style="min-width:200px;">การจัดการ</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-tickets-tbody"></tbody>
+              </table>
+            </div>
+
+            <!-- Reply box (hidden until clicked) -->
+            <div id="admin-ticket-reply-box" class="ticket-reply-box" hidden>
+              <div class="ticket-reply-header">
+                <span class="ticket-reply-icon">💬</span>
+                <h4 id="admin-reply-title">ตอบกลับ Ticket</h4>
+              </div>
+              <textarea id="admin-reply-text" class="input-control" rows="4"
+                placeholder="พิมพ์คำตอบที่จะแสดงให้ผู้ใช้เห็น..."></textarea>
+              <div class="ticket-reply-actions">
+                <label style="font-size:0.82rem; font-weight:600; color:var(--gov-navy-700);">เปลี่ยนสถานะเป็น:</label>
+                <select id="admin-reply-status" class="input-control" style="width:auto; flex:1; min-width:150px;">
+                  <option value="in_progress">กำลังดำเนินการ</option>
+                  <option value="resolved" selected>แก้ไขแล้ว ✅</option>
+                  <option value="pending">รอการแก้ไข</option>
+                </select>
+                <button type="button" class="btn btn-primary btn-sm" id="btn-admin-reply-send">
+                  📨 บันทึกคำตอบกลับ
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-admin-reply-cancel">
+                  ยกเลิก
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+
+  <!-- =======================================================================
+       MODAL 4: ตรวจสอบข้อมูลภาษีของสมาชิกโดย Admin (Member Tax Inspector)
+       ======================================================================= -->
+  <div class="modal-backdrop" id="modal-admin-member-records">
+    <div class="modal-box" style="max-width: 650px;">
+      <div class="modal-header">
+        <h3 id="admin-member-records-title">📂 ข้อมูลภาษีของสมาชิก</h3>
+        <button class="modal-close-btn" aria-label="ปิด">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="records-list" id="admin-member-records-list">
+          <!-- รายการจะถูกแทรกด้วย JavaScript -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- =======================================================================
+       MODAL 5: รายการข้อมูลภาษีที่บันทึกไว้ของฉัน (Saved Records List)
+       ======================================================================= -->
+  <div class="modal-backdrop" id="modal-saved-records">
+    <div class="modal-box" style="max-width: 650px;">
+      <div class="modal-header">
+        <h3>📂 ข้อมูลภาษีที่บันทึกไว้ของฉัน</h3>
+        <button class="modal-close-btn" aria-label="ปิด">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">
+          บันทึกแยกตามปีภาษี (เช่น 2567, 2568) แล้วนำมาเปรียบเทียบรายได้/ภาษีข้ามปีได้
+        </p>
+        <button type="button" class="btn btn-outline-gold btn-sm" id="btn-compare-years" style="margin-bottom:1rem;">📊 เปรียบเทียบข้ามปี</button>
+        <div id="year-compare-table" class="table-responsive" hidden></div>
+        <div class="records-list" id="saved-records-list">
+          <!-- รายการจะถูกแทรกด้วย JavaScript -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- =======================================================================
+       MODAL 6: ดูรายละเอียดเชิงลึกของข้อมูลที่บันทึกไว้ (Deep Detailed Inspector)
+       ======================================================================= -->
+  <div class="modal-backdrop" id="modal-detail-inspector">
+    <div class="modal-box" style="max-width: 720px;">
+      <div class="modal-header">
+        <h3 id="inspector-modal-title">📋 รายละเอียดแบบคำนวณภาษีฉบับเต็ม</h3>
+        <button class="modal-close-btn" aria-label="ปิด">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="detailed-record-container" id="inspector-modal-content">
+          <!-- ข้อมูลเชิงลึกจะถูกแทรกด้วย JavaScript -->
+        </div>
+        <div style="margin-top:1.25rem; padding-top:1rem; border-top:1px solid var(--border-color); display:flex; justify-content:space-between; gap:0.5rem; flex-wrap:wrap;">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-inspector-print">
+            🖨️ พิมพ์หน้านี้
+          </button>
+          <div style="display:flex; gap:0.5rem;">
+            <button type="button" class="btn btn-danger-ghost btn-sm" id="btn-inspector-delete">
+              🗑️ ลบข้อมูลชุดนี้
+            </button>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-inspector-load">
+              📥 นำข้อมูลนี้มากรอกในฟอร์ม
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL: บันทึกข้อมูลปีภาษี -->
+  <div class="modal-backdrop" id="modal-save-record">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>💾 บันทึกการคำนวณตามปีภาษี</h3>
+        <button class="modal-close-btn" aria-label="ปิด">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="form-save-record">
+          <div class="form-group" style="margin-bottom:1rem;">
+            <label class="form-label" for="save-title">ชื่อชุดข้อมูล</label>
+            <input type="text" id="save-title" class="input-control" required>
+          </div>
+          <div class="form-group" style="margin-bottom:1.25rem;">
+            <label class="form-label" for="save-tax-year">ปีภาษี</label>
+            <select id="save-tax-year" class="input-control">
+              <option value="2566">2566</option>
+              <option value="2567">2567</option>
+              <option value="2568">2568</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%;">ยืนยันการบันทึก</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL: แจ้งปัญหา / ติดต่อแอดมิน -->
+  <div class="modal-backdrop" id="modal-contact">
+    <div class="modal-box" style="max-width:560px;">
+      <div class="modal-header">
+        <h3>แจ้งปัญหา / ติดต่อแอดมิน</h3>
+        <button class="modal-close-btn" aria-label="ปิด">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="form-contact-ticket">
+          <div class="form-group" style="margin-bottom:0.85rem;">
+            <label class="form-label" for="ticket-category">ประเภทเรื่อง</label>
+            <select id="ticket-category" class="input-control" required>
+              <option value="calculation_issue">แจ้งปัญหาการคำนวณ</option>
+              <option value="tax_law">สอบถามข้อกฎหมายภาษี</option>
+              <option value="bug">ระบบทำงานผิดพลาด (Bug)</option>
+              <option value="suggestion">ข้อเสนอแนะ</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0.85rem;">
+            <label class="form-label" for="ticket-message">ข้อความรายละเอียด</label>
+            <textarea id="ticket-message" class="input-control" rows="4" required placeholder="อธิบายปัญหาหรือคำถามที่พบ"></textarea>
+          </div>
+          <div class="form-group" style="margin-bottom:0.85rem;">
+            <label class="form-label" for="ticket-contact-name">ชื่อผู้ติดต่อ</label>
+            <input type="text" id="ticket-contact-name" class="input-control" placeholder="ชื่อ-นามสกุล">
+          </div>
+          <div class="form-group" style="margin-bottom:0.85rem;">
+            <label class="form-label" for="ticket-contact-info">ช่องทางติดต่อกลับ (อีเมลหรือเบอร์โทร)</label>
+            <input type="text" id="ticket-contact-info" class="input-control" placeholder="email@example.com หรือ 08x-xxx-xxxx">
+          </div>
+          <div class="form-group" style="margin-bottom:1.25rem;">
+            <label class="form-label" for="ticket-screenshot">ไฟล์แนบ Screenshot (ถ้ามี)</label>
+            <input type="file" id="ticket-screenshot" class="input-control" accept="image/*" style="padding-right:0.85rem;">
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%;">ส่งข้อความถึงแอดมิน</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- เอกสารพิมพ์สรุป ภ.ง.ด. -->
+  <div id="pnd-print-document" class="pnd-print-document" aria-hidden="true"></div>
+
+
+  <!-- แจ้งเตือน Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+
+  <!-- Widget Chat Float -->
+  <div class="chat-widget no-print" id="chat-widget">
+    <button type="button" class="chat-fab" id="btn-chat-fab" aria-label="เปิดแชทสอบถาม">
+      💬
+      <span class="chat-fab-badge" id="chat-fab-badge" hidden>!</span>
+    </button>
+    <div class="chat-panel" id="chat-panel" hidden>
+      <div class="chat-panel-header">
+        <div>
+          <strong>💬 สอบถาม / แจ้งปัญหา</strong>
+          <div style="font-size:0.72rem; color:#94A3B8; margin-top:0.1rem;">แอดมินจะตอบกลับโดยเร็วที่สุด</div>
+        </div>
+        <button type="button" class="chat-close-btn" id="btn-chat-close" aria-label="ปิด">✕</button>
+      </div>
+      <div class="chat-panel-body">
+        <form id="form-chat-ticket">
+          <div class="chat-form-group">
+            <select id="chat-category" class="chat-input">
+              <option value="calculation_issue">🔢 แจ้งปัญหาการคำนวณ</option>
+              <option value="tax_law">📜 สอบถามข้อกฎหมายภาษี</option>
+              <option value="bug">🐛 ระบบทำงานผิดพลาด</option>
+              <option value="suggestion">💡 ข้อเสนอแนะ</option>
+              <option value="other">❓ อื่น ๆ</option>
+            </select>
+          </div>
+          <div class="chat-form-group">
+            <textarea id="chat-message" class="chat-input" rows="3" required
+              placeholder="พิมพ์ข้อความสอบถามหรือแจ้งปัญหา..."></textarea>
+          </div>
+          <div class="chat-form-group">
+            <input type="text" id="chat-contact" class="chat-input"
+              placeholder="📧 อีเมลหรือเบอร์โทรติดต่อกลับ (ถ้ามี)">
+          </div>
+          <div class="chat-form-group">
+            <label class="chat-file-label">
+              📎 แนบ Screenshot
+              <input type="file" id="chat-screenshot" accept="image/*">
+            </label>
+          </div>
+          <button type="submit" class="chat-submit-btn">
+            📨 ส่งข้อความถึงแอดมิน
+          </button>
+        </form>
+
+        <!-- ประวัติของฉัน -->
+        <div class="chat-history-section">
+          <div class="chat-history-title">📋 ประวัติการส่งเรื่อง</div>
+          <div id="chat-my-tickets" class="chat-history"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL: ตั้งค่าระบบ (Settings Modal) -->
+  <div class="modal-backdrop" id="modal-settings">
+    <div class="settings-modal-box">
+      <div class="settings-header">
+        <h3 data-i18n="settings_title">⚙️ การตั้งค่าระบบ (Settings)</h3>
+        <button class="modal-close-btn" aria-label="ปิด">✕</button>
+      </div>
+
+      <!-- แถบแท็บเมนูการตั้งค่า 3 หมวด -->
+      <div class="settings-tabs-bar">
+        <button type="button" class="settings-tab-btn active" data-tab="tab-theme" data-i18n="settings_tab_theme">🎨 ธีม & หน้าจอ</button>
+        <button type="button" class="settings-tab-btn" data-tab="tab-sound" data-i18n="settings_tab_sound">🔊 เสียงประกอบ</button>
+        <button type="button" class="settings-tab-btn" data-tab="tab-lang" data-i18n="settings_tab_lang">🌐 ภาษา</button>
+      </div>
+
+      <!-- เนื้อหาแท็บ 1: ธีม & หน้าจอ -->
+      <div class="settings-tab-panel active" id="tab-theme">
+        <label class="form-label" style="font-weight:600;" data-i18n="theme_select_title">เลือกธีมการแสดงผล:</label>
+        <div class="theme-options-grid">
+          <div class="theme-card-option active" data-theme-val="amber">
+            <div class="theme-preview-dot dot-amber"></div>
+            <div>
+              <strong style="font-size:0.9rem;" data-i18n="theme_amber">☀️ พาสเทลสีทองราชการ</strong>
+              <div style="font-size:0.75rem; color:var(--text-muted);">สีทางการ สบายตา (เริ่มต้น)</div>
+            </div>
+          </div>
+          <div class="theme-card-option" data-theme-val="dark">
+            <div class="theme-preview-dot dot-dark"></div>
+            <div>
+              <strong style="font-size:0.9rem;" data-i18n="theme_dark">🌙 ดาร์กโหมดพรีเมียม</strong>
+              <div style="font-size:0.75rem; color:var(--text-muted);">โหมดมืด หรูหรา สบายตาตอนกลางคืน</div>
+            </div>
+          </div>
+          <div class="theme-card-option" data-theme-val="navy">
+            <div class="theme-preview-dot dot-navy"></div>
+            <div>
+              <strong style="font-size:0.9rem;" data-i18n="theme_navy">🏛️ สีกรมท่าทางการ</strong>
+              <div style="font-size:0.75rem; color:var(--text-muted);">สไตล์สมุดบัญชีองค์กร Navy Slate</div>
+            </div>
+          </div>
+          <div class="theme-card-option" data-theme-val="emerald">
+            <div class="theme-preview-dot dot-emerald"></div>
+            <div>
+              <strong style="font-size:0.9rem;" data-i18n="theme_emerald">🌿 มรกตถนอมสายตา</strong>
+              <div style="font-size:0.75rem; color:var(--text-muted);">โทนสีเขียวการเงิน ถนอมสายตา</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:1.25rem;">
+          <label class="form-label" for="setting-font-size" style="font-weight:600;" data-i18n="font_size_title">ขนาดตัวอักษรบนหน้าจอ:</label>
+          <select id="setting-font-size" class="input-control" style="max-width:280px;">
+            <option value="normal" data-i18n="font_normal">ปกติ (100%)</option>
+            <option value="large" data-i18n="font_large">ใหญ่ (115%)</option>
+            <option value="xlarge" data-i18n="font_xlarge">ใหญ่พิเศษ (130%)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- เนื้อหาแท็บ 2: เสียงประกอบ -->
+      <div class="settings-tab-panel" id="tab-sound">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+          <div>
+            <strong data-i18n="sound_toggle_title">เปิดใช้งานเสียงเอฟเฟกต์ (UI Audio):</strong>
+            <div style="font-size:0.75rem; color:var(--text-muted);">สังเคราะห์เสียงผ่าน Web Audio API รวดเร็ว ไม่มีสะดุด</div>
+          </div>
+          <label style="display:flex; align-items:center; cursor:pointer;">
+            <input type="checkbox" id="setting-sound-enabled" checked style="width:1.3rem; height:1.3rem; accent-color:var(--primary-color);">
+          </label>
+        </div>
+
+        <div style="margin-bottom:1rem;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
+            <label class="form-label" for="setting-sound-volume" data-i18n="sound_volume_title">ระดับความดังเสียง:</label>
+            <span id="setting-volume-display" style="font-weight:600; color:var(--primary-color);">35%</span>
+          </div>
+          <input type="range" id="setting-sound-volume" class="quick-sim-slider" min="0" max="1" step="0.05" value="0.35" style="width:100%;">
+        </div>
+
+        <div style="margin-bottom:1.25rem;">
+          <label class="form-label" for="setting-sound-pack" data-i18n="sound_pack_title">ชุดเสียงเอฟเฟกต์:</label>
+          <select id="setting-sound-pack" class="input-control" style="max-width:280px;">
+            <option value="modern">โมเดิร์นคลาสสิก (Modern Digital)</option>
+            <option value="coin">แคชเชียร์เหรียญทอง (Golden Coins)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="form-label" style="font-weight:600;" data-i18n="sound_test_title">ทดลองฟังเสียง:</label>
+          <div class="sound-test-grid">
+            <button type="button" class="btn btn-secondary btn-sm" id="test-sound-click" data-i18n="btn_sound_click">🖱️ คลิกปุ่ม</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="test-sound-calc" data-i18n="btn_sound_calc">⚡ คำนวณภาษี</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="test-sound-coin" data-i18n="btn_sound_coin">💰 เงินออมภาษี</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="test-sound-alert" data-i18n="btn_sound_alert">⚠️ แจ้งเตือน</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- เนื้อหาแท็บ 3: ภาษา -->
+      <div class="settings-tab-panel" id="tab-lang">
+        <label class="form-label" style="font-weight:600;" data-i18n="lang_select_title">เลือกภาษาที่ใช้งาน (Select Language):</label>
+        <div style="display:flex; flex-direction:column; gap:0.75rem; margin-top:0.75rem;">
+          <label class="theme-card-option" id="lang-opt-th" style="cursor:pointer;">
+            <input type="radio" name="app_lang" value="th" checked style="accent-color:var(--primary-color);">
+            <div>
+              <strong style="font-size:1rem;" data-i18n="lang_th">🇹🇭 ภาษาไทย (Thai)</strong>
+              <div style="font-size:0.75rem; color:var(--text-muted);">เมนูและคำแนะนำตามประมวลรัษฎากรไทย</div>
+            </div>
+          </label>
+          <label class="theme-card-option" id="lang-opt-en" style="cursor:pointer;">
+            <input type="radio" name="app_lang" value="en" style="accent-color:var(--primary-color);">
+            <div>
+              <strong style="font-size:1rem;" data-i18n="lang_en">🇬🇧 English (ภาษาอังกฤษ)</strong>
+              <div style="font-size:0.75rem; color:var(--text-muted);">International English translation for expat tax filing</div>
+            </div>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/sound-engine.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/tax-engine.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/settings-ui.js"></script>
+</body>
+</html>
+
+
