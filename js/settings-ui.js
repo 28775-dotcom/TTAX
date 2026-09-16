@@ -348,6 +348,18 @@
         return;
       }
 
+      // ตรวจสอบว่าผู้ใช้เข้าสู่ระบบหรือไม่ (ผู้ที่ไม่ได้เข้าระบบจะไม่มีการเก็บข้อมูลใดๆ)
+      let loggedInUser = null;
+      try {
+        const raw = localStorage.getItem('tax_portal_user');
+        if (raw) loggedInUser = JSON.parse(raw);
+      } catch (e) {}
+
+      if (!loggedInUser || loggedInUser.role === 'guest' || !loggedInUser.id) {
+        notify('⚠️ กรุณาเข้าสู่ระบบก่อนทำการซิงค์ข้อมูล (ผู้ที่ไม่ได้เข้าสู่ระบบจะไม่สามารถบันทึกข้อมูลได้)', 'warning');
+        return;
+      }
+
       try {
         notify('กำลังซิงค์ข้อมูลกับ Supabase Cloud...', 'info');
         // Sync tax calculation draft if available
@@ -361,6 +373,8 @@
         });
 
         await SupabaseService.saveTaxRecord({
+          user_id: loggedInUser.id,
+          user_name: loggedInUser.full_name || loggedInUser.username,
           title: `รายการซิงค์ภาษี (${type === 'individual' ? 'บุคคลธรรมดา' : 'นิติบุคคล'}) ปี ${currentYear}`,
           tax_year: currentYear,
           taxpayer_type: type,

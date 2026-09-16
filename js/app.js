@@ -445,6 +445,8 @@
   let lastAutoSavedHash = '';
 
   async function autoSaveCalculatedRecord() {
+    // นโยบายความเป็นส่วนตัว: คนที่ไม่ได้เข้าระบบจะไม่มีการเก็บข้อมูลใดๆ ทั้งสิ้น
+    if (!currentUser || currentUser.role === 'guest' || !currentUser.id) return;
     if (!hasFirstStepData() || !latestResult) return;
 
     const income = Number(latestResult.totalIncome || latestResult.totalRevenue || 0);
@@ -453,7 +455,7 @@
     const formData = getFormData();
     const year = document.getElementById('global-tax-year')?.value || '2567';
     const taxAmount = Number(latestResult.finalAmount || latestResult.taxPayableBeforeWht || latestResult.totalCorporateTax || 0);
-    const userTag = currentUser ? String(currentUser.id) : 'guest';
+    const userTag = String(currentUser.id);
     const currentHash = `${taxpayerType}_${year}_${income}_${taxAmount}_${userTag}`;
 
     if (currentHash === lastAutoSavedHash) return;
@@ -467,15 +469,38 @@
       ? `แบบคำนวณภาษีนิติบุคคล (คำนวณ ${dateStr} ${timeStr} น.)`
       : `แบบคำนวณภาษีบุคคลธรรมดา (คำนวณ ${dateStr} ${timeStr} น.)`;
 
-    const recId = 'calc_' + Date.now();
+    let supaSavedId = null;
+
+    // 1. บันทึกลง Supabase Cloud โดยตรงสำหรับผู้ใช้ที่เข้าสู่ระบบ
+    if (window.SupabaseService && SupabaseService.isConfigured()) {
+      try {
+        const supaRec = await SupabaseService.saveTaxRecord({
+          user_id: currentUser.id,
+          user_name: currentUser.full_name || currentUser.username,
+          title: title,
+          tax_year: year,
+          taxpayer_type: taxpayerType,
+          income_data: formData,
+          summary_data: latestResult
+        });
+        if (supaRec && supaRec.id) {
+          supaSavedId = supaRec.id;
+        }
+      } catch (e) {
+        console.warn('Auto-save Supabase error', e);
+      }
+    }
+
+    const recId = supaSavedId || ('calc_' + Date.now());
     const recordPayload = {
       id: recId,
+      supabase_id: supaSavedId,
       title: title,
       tax_year: year,
       taxpayer_type: taxpayerType,
-      user_name: currentUser ? (currentUser.full_name || currentUser.username || currentUser.email) : 'สมาชิกในระบบ',
-      user_id: currentUser ? currentUser.id : 'usr_guest',
-      user_email: currentUser ? currentUser.email : '',
+      user_name: currentUser.full_name || currentUser.username || currentUser.email,
+      user_id: currentUser.id,
+      user_email: currentUser.email || '',
       income: income,
       allowances: Number(latestResult.totalAllowances || latestResult.totalAllowance || 0),
       taxPayable: taxAmount,
@@ -486,7 +511,7 @@
       is_auto_calc: true
     };
 
-    // 1. บันทึกลง LocalStorage
+    // 2. บันทึกลง LocalStorage เฉพาะของผู้ใช้ที่เข้าสู่ระบบแล้ว
     try {
       const allRecords = getAllSystemTaxRecords();
       allRecords.unshift(recordPayload);
@@ -494,23 +519,6 @@
       localStorage.setItem('tax_portal_saved_records', JSON.stringify(allRecords));
     } catch (e) {
       console.warn('Auto-save local error', e);
-    }
-
-    // 2. บันทึกลง Supabase Cloud
-    if (window.SupabaseService && SupabaseService.isConfigured()) {
-      try {
-        await SupabaseService.saveTaxRecord({
-          user_id: currentUser?.id,
-          user_name: currentUser ? (currentUser.full_name || currentUser.username) : 'สมาชิกในระบบ',
-          title: title,
-          tax_year: year,
-          taxpayer_type: taxpayerType,
-          income_data: formData,
-          summary_data: latestResult
-        });
-      } catch (e) {
-        console.warn('Auto-save Supabase error', e);
-      }
     }
   }
 
@@ -1017,11 +1025,66 @@
     return accounts[email.toLowerCase().trim()] || null;
   }
 
-  function loginAsAdminUser() {
+  async function ensureSupabaseNumericUserId(userObj) {
+    if (!userObj) return null;
+    if (Number.isInteger(Number(userObj.id)) && Number(userObj.id) > 0) {
+      return Number(userObj.id);
+    }
+    if (window.SupabaseService && SupabaseService.isConfigured()) {
+      try {
+        const identifier = userObj.email || userObj.username || (userObj.role === 'admin' ? 'admin' : null);
+        if (identifier) {
+          let dbUser = await SupabaseService.fetchUserProfile(identifier);
+          if (!dbUser) {
+            dbUser = await SupabaseService.saveUserProfile({
+              username: userObj.username || (userObj.email ? userObj.email.split('@')[0] : ('user_' + Date.now())),
+              email: userObj.email || null,
+              full_name: userObj.full_name || '',
+              role: userObj.role || 'member',
+              tax_id: userObj.tax_id || '',
+              password_hash: userObj.password || 'member1234'
+            });
+          }
+          if (dbUser && dbUser.id) {
+            return Number(dbUser.id);
+          }
+        }
+      } catch (e) {
+        console.warn('ensureSupabaseNumericUserId error:', e);
+      }
+    }
+    return userObj.id;
+  }
+
+  async function loginAsAdminUser() {
+    let adminNumericId = 8;
+    if (window.SupabaseService && SupabaseService.isConfigured()) {
+      try {
+        let dbAdmin = await SupabaseService.fetchUserProfile('admin');
+        if (!dbAdmin) {
+          dbAdmin = await SupabaseService.saveUserProfile({
+            username: 'admin',
+            email: 'admin@taxportal.go.th',
+            full_name: 'ผู้ดูแลระบบ (Admin TAX PORTAL)',
+            role: 'admin',
+            tax_id: '0105559999999',
+            password_hash: 'admin1234',
+            company_name: 'สำนักงานพัฒนาธุรกรรมและบริการภาษี TAX PORTAL'
+          });
+        }
+        if (dbAdmin && dbAdmin.id) {
+          adminNumericId = Number(dbAdmin.id);
+        }
+      } catch (e) {
+        console.warn('Admin Supabase sync error:', e);
+      }
+    }
+
     currentUser = {
-      id: 'usr_admin',
+      id: adminNumericId,
       full_name: 'ผู้ดูแลระบบ (Admin TAX PORTAL)',
       email: 'admin@taxportal.go.th',
+      username: 'admin',
       role: 'admin',
       profile_pic: '👑',
       tax_id: '0105559999999',
@@ -1043,9 +1106,17 @@
     try {
       const savedUser = localStorage.getItem(STORAGE_KEY_CURRENT_USER);
       if (savedUser) {
-        currentUser = JSON.parse(savedUser);
-        updateAuthUI();
-        return;
+        const parsed = JSON.parse(savedUser);
+        if (parsed && parsed.role !== 'guest') {
+          currentUser = parsed;
+          // ซิงค์รหัสผู้ใช้ให้เป็น ID ตัวเลขจริงใน Supabase
+          currentUser.id = await ensureSupabaseNumericUserId(currentUser);
+          localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
+          updateAuthUI();
+          return;
+        } else {
+          localStorage.removeItem(STORAGE_KEY_CURRENT_USER);
+        }
       }
     } catch (e) { /* ignore */ }
 
@@ -1054,8 +1125,12 @@
       try {
         const { user } = await SupabaseService.getUser();
         if (user) {
+          let userNumericId = null;
+          const dbUser = await SupabaseService.fetchUserProfile(user.email);
+          if (dbUser && dbUser.id) userNumericId = Number(dbUser.id);
+
           currentUser = {
-            id: user.id,
+            id: userNumericId || user.id,
             full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'ผู้ใช้',
             email: user.email,
             role: user.user_metadata?.role || 'member',
@@ -1065,6 +1140,7 @@
             company_name: user.user_metadata?.company_name || '',
             address: user.user_metadata?.address || ''
           };
+          currentUser.id = await ensureSupabaseNumericUserId(currentUser);
           localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
           updateAuthUI();
           return;
@@ -1080,6 +1156,7 @@
       const data = await res.json();
       if (data.logged_in && data.user) {
         currentUser = data.user;
+        currentUser.id = await ensureSupabaseNumericUserId(currentUser);
         localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
         updateAuthUI();
         return;
@@ -1110,7 +1187,7 @@
 
     // 0. ตรวจสอบบัญชี Admin (พิมพ์ admin / admin1234 หรือ admin)
     if ((loginLower === 'admin' || loginLower === 'admin@taxportal.go.th') && (password === 'admin' || password === 'admin1234')) {
-      loginAsAdminUser();
+      await loginAsAdminUser();
       setButtonLoading(btn, false);
       return;
     }
@@ -1122,6 +1199,7 @@
         id: localAcc.id,
         full_name: localAcc.full_name,
         email: localAcc.email,
+        username: localAcc.email ? localAcc.email.split('@')[0] : loginLower,
         role: localAcc.role || (loginLower.includes('admin') ? 'admin' : 'member'),
         profile_pic: localAcc.profile_pic || (localAcc.role === 'admin' ? '👑' : ''),
         tax_id: localAcc.tax_id || '',
@@ -1129,6 +1207,9 @@
         company_name: localAcc.company_name || '',
         address: localAcc.address || ''
       };
+      currentUser.id = await ensureSupabaseNumericUserId(currentUser);
+      localAcc.id = currentUser.id;
+      saveRegisteredAccount(localAcc);
       localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
       updateAuthUI();
       closeModal('modal-auth');
@@ -1152,6 +1233,7 @@
             id: user.id,
             full_name: user.user_metadata?.full_name || (localAcc?.full_name) || email.split('@')[0],
             email: user.email,
+            username: email.split('@')[0],
             role: userRole,
             profile_pic: user.user_metadata?.profile_pic || (userRole === 'admin' ? '👑' : ''),
             tax_id: user.user_metadata?.tax_id || '',
@@ -1159,6 +1241,7 @@
             company_name: user.user_metadata?.company_name || '',
             address: user.user_metadata?.address || ''
           };
+          currentUser.id = await ensureSupabaseNumericUserId(currentUser);
           saveRegisteredAccount({ id: currentUser.id, email, password, full_name: currentUser.full_name, tax_id: currentUser.tax_id, role: userRole });
           localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
           updateAuthUI();
@@ -1174,8 +1257,6 @@
 
         const errMsg = (error?.message || '').toLowerCase();
         const errCode = (error?.code || '').toLowerCase();
-        // ถ้า Supabase แจ้งว่ายังไม่ได้ยืนยันอีเมล หรือติด confirm / verification ใดๆ
-        // ไม่ต้องขึ้นเตือนยืนยันอีเมล ให้เข้าสู่ระบบได้ทันที 100%!
         const isConfirmIssue = errMsg.includes('confirm') ||
                               errCode.includes('confirm') ||
                               errMsg.includes('verify') ||
@@ -1187,9 +1268,10 @@
           const fallbackName = (localAcc && localAcc.full_name) ? localAcc.full_name : email.split('@')[0];
           const userRole = (localAcc && localAcc.role) ? localAcc.role : (loginLower.includes('admin') ? 'admin' : 'member');
           currentUser = {
-            id: (localAcc && localAcc.id) ? localAcc.id : 'usr_' + btoa(email).replace(/=/g, '').slice(-12),
+            id: (localAcc && localAcc.id) ? localAcc.id : null,
             full_name: fallbackName,
             email: email,
+            username: email.split('@')[0],
             role: userRole,
             profile_pic: userRole === 'admin' ? '👑' : '',
             tax_id: localAcc ? localAcc.tax_id : '',
@@ -1197,15 +1279,9 @@
             company_name: '',
             address: ''
           };
+          currentUser.id = await ensureSupabaseNumericUserId(currentUser);
           saveRegisteredAccount({ id: currentUser.id, email, password, full_name: currentUser.full_name, tax_id: currentUser.tax_id, role: userRole });
           localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
-          try {
-            fetch(API_BASE + '/auth.php?action=login', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ username: email, password })
-            }).catch(() => {});
-          } catch (e) {}
           updateAuthUI();
           closeModal('modal-auth');
           setButtonLoading(btn, false);
@@ -1231,6 +1307,7 @@
       const data = await res.json();
       if (data.success && data.user) {
         currentUser = data.user;
+        currentUser.id = await ensureSupabaseNumericUserId(currentUser);
         saveRegisteredAccount({ id: currentUser.id, email, password, full_name: currentUser.full_name, tax_id: currentUser.tax_id, role: currentUser.role });
         localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
         updateAuthUI();
@@ -1306,7 +1383,37 @@
     const btn = document.getElementById('btn-register-submit');
     setButtonLoading(btn, true);
 
-    const newUserId = 'usr_' + Date.now();
+    let supabaseNumericId = null;
+    // ลงทะเบียนเข้าตาราง public.users บน Supabase Cloud ทันทีเพื่อดึง Primary Key BIGINT
+    if (window.SupabaseService && SupabaseService.isConfigured()) {
+      try {
+        const dbUser = await SupabaseService.saveUserProfile({
+          username: regEmail.split('@')[0] + '_' + Math.floor(1000 + Math.random() * 9000),
+          email: regEmail,
+          full_name: fullName,
+          tax_id: taxId,
+          password: password,
+          role: 'member'
+        });
+        if (dbUser && dbUser.id) {
+          supabaseNumericId = Number(dbUser.id);
+        }
+      } catch (err) {
+        console.warn('Supabase saveUserProfile error:', err);
+      }
+
+      try {
+        await SupabaseService.signUp(regEmail, password, {
+          full_name: fullName,
+          tax_id: taxId,
+          role: 'member'
+        });
+      } catch (err) {
+        console.warn('Supabase background signup note:', err);
+      }
+    }
+
+    const newUserId = supabaseNumericId || ('usr_' + Date.now());
     const newAccount = {
       id: newUserId,
       email: regEmail,
@@ -1319,23 +1426,6 @@
 
     // บันทึกบัญชีในระบบทันที ไม่ต้องรอยืนยันอีเมล!
     saveRegisteredAccount(newAccount);
-
-    // พยายามลงทะเบียนใน Supabase เบื้องหลัง (Background sync)
-    if (window.SupabaseService && SupabaseService.isConfigured()) {
-      try {
-        const { data } = await SupabaseService.signUp(regEmail, password, {
-          full_name: fullName,
-          tax_id: taxId,
-          role: 'member'
-        });
-        if (data?.user?.id) {
-          newAccount.id = data.user.id;
-          saveRegisteredAccount(newAccount);
-        }
-      } catch (err) {
-        console.warn('Supabase background signup note:', err);
-      }
-    }
 
     // ซิงค์บัญชีไปยัง PHP DB ในเบื้องหลัง
     try {
@@ -1352,11 +1442,11 @@
       }).catch(() => {});
     } catch (e) {}
 
-    // สมัครและเข้าสู่ระบบทันที 100% ไม่ต้องยืนยันอีเมล!
     currentUser = {
       id: newAccount.id,
       full_name: fullName,
       email: regEmail,
+      username: regEmail.split('@')[0],
       role: 'member',
       profile_pic: '',
       tax_id: taxId,
@@ -1364,6 +1454,7 @@
       company_name: '',
       address: ''
     };
+    currentUser.id = await ensureSupabaseNumericUserId(currentUser);
     localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
     updateAuthUI();
     closeModal('modal-auth');
@@ -1392,7 +1483,11 @@
 
     currentUser = null;
     currentRecordId = null;
+    savedRecordsCache = [];
     updateAuthUI();
+    closeModal('modal-saved-records');
+    closeModal('modal-save-record');
+    closeModal('modal-detail-inspector');
     showToast('ออกจากระบบเรียบร้อยแล้ว', 'info');
   }
 
@@ -1649,95 +1744,10 @@
     let records = [];
     try {
       records = JSON.parse(localStorage.getItem('tax_portal_saved_records') || '[]');
+      // กรองรายการ mock ตัวอย่างเดิมออกทั้งหมด เพื่อรักษาความถูกต้องและความเป็นส่วนตัว
+      records = records.filter(r => r && r.id && !String(r.id).startsWith('rec_sample_'));
     } catch (e) {
       records = [];
-    }
-
-    if (!records || records.length === 0) {
-      records = [
-        {
-          id: 'rec_sample_01',
-          title: 'แบบคำนวณภาษีเงินได้บุคคลธรรมดา ภ.ง.ด. 91',
-          tax_year: '2567',
-          taxpayer_type: 'individual',
-          user_name: 'คุณสมชาย ใจดี (วิศวกรซอฟต์แวร์)',
-          user_id: 'usr_001',
-          income: 960000,
-          allowances: 230000,
-          taxPayable: 61000,
-          updated_at: '2026-09-12T10:30:00Z',
-          summary: {
-            taxpayerType: 'individual',
-            totalIncome: 960000,
-            totalAllowances: 230000,
-            taxPayableBeforeWht: 61000,
-            finalAmount: 61000,
-            taxResultType: 'pay_more'
-          }
-        },
-        {
-          id: 'rec_sample_02',
-          title: 'แบบคำนวณภาษีเงินได้นิติบุคคล ภ.ง.ด. 50 (SME)',
-          tax_year: '2567',
-          taxpayer_type: 'corporate',
-          user_name: 'บริษัท สยาม ดิจิทัล โซลูชั่นส์ จำกัด',
-          user_id: 'usr_002',
-          income: 4500000,
-          allowances: 1200000,
-          taxPayable: 255000,
-          updated_at: '2026-09-13T14:15:00Z',
-          summary: {
-            taxpayerType: 'corporate',
-            totalRevenue: 4500000,
-            totalCorporateTax: 255000,
-            finalAmount: 255000,
-            taxResultType: 'pay_more'
-          }
-        },
-        {
-          id: 'rec_sample_03',
-          title: 'แบบคำนวณภาษีเงินได้บุคคลธรรมดา ภ.ง.ด. 90 (ฟรีแลนซ์/ขายของออนไลน์)',
-          tax_year: '2567',
-          taxpayer_type: 'individual',
-          user_name: 'คุณกิตติศักดิ์ พัฒนากุล',
-          user_id: 'usr_003',
-          income: 1450000,
-          allowances: 340000,
-          taxPayable: 112500,
-          updated_at: '2026-09-14T09:00:00Z',
-          summary: {
-            taxpayerType: 'individual',
-            totalIncome: 1450000,
-            totalAllowances: 340000,
-            taxPayableBeforeWht: 112500,
-            finalAmount: 112500,
-            taxResultType: 'pay_more'
-          }
-        },
-        {
-          id: 'rec_sample_04',
-          title: 'แบบคำนวณภาษีเงินได้บุคคลธรรมดา ภ.ง.ด. 91',
-          tax_year: '2567',
-          taxpayer_type: 'individual',
-          user_name: 'คุณพัชราภรณ์ วงศ์สว่าง',
-          user_id: 'usr_004',
-          income: 720000,
-          allowances: 280000,
-          taxPayable: 21500,
-          updated_at: '2026-09-14T16:45:00Z',
-          summary: {
-            taxpayerType: 'individual',
-            totalIncome: 720000,
-            totalAllowances: 280000,
-            taxPayableBeforeWht: 21500,
-            finalAmount: 21500,
-            taxResultType: 'pay_more'
-          }
-        }
-      ];
-      try {
-        localStorage.setItem('tax_portal_saved_records', JSON.stringify(records));
-      } catch (e) {}
     }
     return records;
   }
@@ -2107,18 +2117,12 @@
   // =========================================================================
 
   async function handleSaveRecord() {
-    if (!currentUser) {
-      // Auto-assign guest user so calculation can be saved without mandatory login barrier
-      currentUser = {
-        id: 'usr_guest_' + Date.now(),
-        full_name: 'ผู้ใช้งานทั่วไป (Guest)',
-        role: 'guest',
-        email: ''
-      };
-      try {
-        localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
-        updateAuthUI();
-      } catch (e) {}
+    // นโยบายความปลอดภัยและความเป็นส่วนตัว: ผู้ที่ไม่ได้เข้าสู่ระบบจะไม่สามารถบันทึกข้อมูลใดๆ
+    if (!currentUser || currentUser.role === 'guest' || !currentUser.id) {
+      showToast('⚠️ กรุณาเข้าสู่ระบบก่อนบันทึกข้อมูลแบบคำนวณภาษี (ผู้ที่ไม่ได้เข้าสู่ระบบจะไม่สามารถบันทึกข้อมูลได้)', 'warning');
+      showAuthTab('login');
+      openModal('modal-auth');
+      return;
     }
 
     if (!hasFirstStepData()) {
@@ -2145,6 +2149,14 @@
 
   async function submitSaveRecord(e) {
     e.preventDefault();
+    if (!currentUser || currentUser.role === 'guest' || !currentUser.id) {
+      showToast('⚠️ กรุณาเข้าสู่ระบบก่อนบันทึกข้อมูล (ผู้ที่ไม่ได้เข้าสู่ระบบจะไม่สามารถบันทึกข้อมูลได้)', 'warning');
+      closeModal('modal-save-record');
+      showAuthTab('login');
+      openModal('modal-auth');
+      return;
+    }
+
     const formData = getFormData();
     const titlePrompt = document.getElementById('save-title').value.trim();
     const taxYear = document.getElementById('save-tax-year').value || '2567';
@@ -2153,13 +2165,13 @@
     let recId = currentRecordId || ('rec_' + Date.now());
     let savedOnSupabase = false;
 
-    // 1. Sync directly to Supabase Cloud
+    // 1. ซิงค์ตรงไปยัง Supabase Cloud พร้อม user_id ที่ถูกต้อง
     if (window.SupabaseService && SupabaseService.isConfigured()) {
       try {
         const supaRec = await SupabaseService.saveTaxRecord({
           supabase_id: typeof recId === 'number' ? recId : undefined,
-          user_id: currentUser?.id,
-          user_name: currentUser ? (currentUser.full_name || currentUser.username) : 'ผู้ใช้งาน',
+          user_id: currentUser.id,
+          user_name: currentUser.full_name || currentUser.username,
           title: titlePrompt,
           tax_year: taxYear,
           taxpayer_type: taxpayerType,
@@ -2181,9 +2193,9 @@
       title: titlePrompt,
       tax_year: taxYear,
       taxpayer_type: taxpayerType,
-      user_name: currentUser ? (currentUser.full_name || currentUser.username || currentUser.email) : 'ผู้ใช้งาน',
-      user_id: currentUser ? currentUser.id : 'usr_guest',
-      user_email: currentUser ? currentUser.email : '',
+      user_name: currentUser.full_name || currentUser.username || currentUser.email,
+      user_id: currentUser.id,
+      user_email: currentUser.email || '',
       income: Number(latestResult?.totalIncome || latestResult?.totalRevenue || 0),
       allowances: Number(latestResult?.totalAllowances || latestResult?.totalAllowance || 0),
       taxPayable: Number(latestResult?.taxPayableBeforeWht || latestResult?.totalCorporateTax || latestResult?.finalAmount || 0),
@@ -2193,7 +2205,7 @@
       income_data: formData || {}
     };
 
-    // 2. Save to local system records cache
+    // 2. บันทึกลง local cache เฉพาะของผู้ใช้คนนี้
     try {
       const allRecords = getAllSystemTaxRecords();
       const existingIdx = allRecords.findIndex(r => String(r.id) === String(recId));
@@ -2248,29 +2260,45 @@
   async function openSavedRecordsModal() {
     openModal('modal-saved-records');
     const listContainer = document.getElementById('saved-records-list');
-    listContainer.innerHTML = '<p style="text-align:center; color:#92400E; padding:1.5rem;">⏳ กำลังโหลดข้อมูลภาษีที่บันทึกไว้...</p>';
+
+    // นโยบายความเป็นส่วนตัว: หากไม่ได้เข้าสู่ระบบ จะไม่มีการเก็บและแสดงข้อมูลใดๆ ทั้งสิ้น
+    if (!currentUser || currentUser.role === 'guest' || !currentUser.id) {
+      listContainer.innerHTML = `
+        <div style="text-align:center; padding:3rem 1.5rem; color:#64748B;">
+          <div style="font-size:3.5rem; margin-bottom:1rem;">🔒</div>
+          <h3 style="color:#78350F; margin-bottom:0.5rem; font-weight:700;">กรุณาเข้าสู่ระบบเพื่อดูข้อมูล</h3>
+          <p style="font-size:0.95rem; max-width:440px; margin:0 auto 1.5rem; line-height:1.6; color:#64748B;">
+            ระบบไม่มีการบันทึกข้อมูลใดๆ สำหรับผู้ใช้งานทั่วไปที่ไม่ได้เข้าสู่ระบบ<br>
+            กรุณาเข้าสู่ระบบหรือสมัครสมาชิกเพื่อบันทึกและจัดการแบบคำนวณภาษีของคุณ
+          </p>
+          <div style="display:flex; justify-content:center; gap:0.75rem;">
+            <button class="btn btn-primary" id="btn-login-from-saved">🔑 เข้าสู่ระบบ / สมัครสมาชิก</button>
+          </div>
+        </div>
+      `;
+      document.getElementById('btn-login-from-saved')?.addEventListener('click', () => {
+        closeModal('modal-saved-records');
+        showAuthTab('login');
+        openModal('modal-auth');
+      });
+      savedRecordsCache = [];
+      return;
+    }
+
+    listContainer.innerHTML = '<p style="text-align:center; color:#92400E; padding:1.5rem;">⏳ กำลังโหลดข้อมูลภาษีเฉพาะของคุณ...</p>';
 
     let recordsMap = new Map();
 
-    // 1. Fetch from LocalStorage
-    try {
-      const localRecs = getAllSystemTaxRecords();
-      localRecs.forEach(r => {
-        recordsMap.set(String(r.id), r);
-      });
-    } catch (e) {
-      console.warn('Local records fetch note:', e);
-    }
-
-    // 2. Fetch from Supabase Cloud
+    // 1. ดึงจาก Supabase Cloud เฉพาะของ user_id ตนเองเท่านั้น
     if (window.SupabaseService && SupabaseService.isConfigured()) {
       try {
-        const supaRecs = await SupabaseService.fetchTaxRecords();
+        const supaRecs = await SupabaseService.fetchTaxRecords(currentUser.id);
         if (Array.isArray(supaRecs)) {
           supaRecs.forEach(r => {
             recordsMap.set(String(r.id), {
               id: r.id,
               supabase_id: r.id,
+              user_id: r.user_id,
               title: r.title,
               tax_year: r.tax_year,
               taxpayer_type: r.taxpayer_type,
@@ -2291,26 +2319,19 @@
       }
     }
 
-    // 3. Fetch from PHP Backend
+    // 2. ดึงจาก LocalStorage กรองเฉพาะรายการของ currentUser เท่านั้น
     try {
-      const res = await fetch(API_BASE + '/tax.php?action=list');
-      const data = await res.json();
-      if (data.success && Array.isArray(data.records)) {
-        data.records.forEach(r => {
-          recordsMap.set(String(r.id), {
-            id: r.id,
-            title: r.title,
-            tax_year: r.tax_year,
-            summary: r.summary || {},
-            summary_data: r.summary || {},
-            income_data: r.income_data || {},
-            created_at: r.created_at,
-            updated_at: r.updated_at
-          });
-        });
-      }
-    } catch (phpErr) {
-      // Offline / static mode
+      const localRecs = getAllSystemTaxRecords().filter(r => {
+        if (!r.user_id) return false;
+        return String(r.user_id) === String(currentUser.id) || (r.user_email && r.user_email === currentUser.email);
+      });
+      localRecs.forEach(r => {
+        if (!recordsMap.has(String(r.id))) {
+          recordsMap.set(String(r.id), r);
+        }
+      });
+    } catch (e) {
+      console.warn('Local records fetch note:', e);
     }
 
     const records = Array.from(recordsMap.values()).sort((a, b) => {
@@ -2323,7 +2344,7 @@
       listContainer.innerHTML = `
         <div style="text-align:center; padding:2.5rem 1rem; color:#64748B;">
           <div style="font-size:3rem; margin-bottom:0.75rem;">📂</div>
-          <h4 style="color:#78350F; margin-bottom:0.35rem;">ยังไม่มีแบบคำนวณภาษีที่บันทึกไว้</h4>
+          <h4 style="color:#78350F; margin-bottom:0.35rem;">ยังไม่มีแบบคำนวณภาษีที่บันทึกไว้สำหรับบัญชีนี้</h4>
           <p style="font-size:0.9rem;">เมื่อคุณคำนวณภาษีเสร็จ สามารถกดปุ่ม <strong>"💾 บันทึกข้อมูลชุดนี้"</strong> เพื่อเก็บประวัติและกลับมาแก้ไขได้ตลอดเวลา</p>
         </div>
       `;
@@ -2333,6 +2354,15 @@
 
     savedRecordsCache = records;
     listContainer.innerHTML = '';
+
+    // แสดง Header ข้อมูลผู้ใช้งานที่เข้าสู่ระบบ
+    const userBanner = document.createElement('div');
+    userBanner.style.cssText = 'display:flex; justify-content:space-between; align-items:center; background:#FEF3C7; border:1px solid #FCD34D; padding:0.6rem 1rem; border-radius:8px; margin-bottom:1rem; font-size:0.85rem; color:#92400E; flex-wrap:wrap; gap:0.5rem;';
+    userBanner.innerHTML = `
+      <span>👤 แบบคำนวณของ: <strong>${currentUser.full_name || currentUser.username}</strong></span>
+      <span style="color:#059669; font-weight:600;">🔒 แยกสิทธิ์เฉพาะคุณ (Supabase Cloud)</span>
+    `;
+    listContainer.appendChild(userBanner);
 
     records.forEach((rec) => {
       const item = document.createElement('div');
@@ -2380,6 +2410,10 @@
   }
 
   async function openDetailedRecordInspector(id) {
+    if (!currentUser || currentUser.role === 'guest' || !currentUser.id) {
+      showToast('⚠️ กรุณาเข้าสู่ระบบก่อนดูรายละเอียดแบบคำนวณ', 'warning');
+      return;
+    }
     try {
       let rec = savedRecordsCache.find(r => String(r.id) === String(id));
 
@@ -2401,6 +2435,12 @@
 
       if (!rec) {
         showToast('ไม่พบข้อมูลแบบคำนวณที่ต้องการดูรายละเอียด', 'error');
+        return;
+      }
+
+      // ตรวจสอบสิทธิ์ความเป็นเจ้าของข้อมูล
+      if (rec.user_id && String(rec.user_id) !== String(currentUser.id) && currentUser.role !== 'admin') {
+        showToast('❌ คุณไม่มีสิทธิ์เข้าถึงข้อมูลของผู้อื่น', 'error');
         return;
       }
 
@@ -2548,6 +2588,10 @@
   }
 
   async function loadRecordById(id) {
+    if (!currentUser || currentUser.role === 'guest' || !currentUser.id) {
+      showToast('⚠️ กรุณาเข้าสู่ระบบก่อน', 'warning');
+      return;
+    }
     try {
       let rec = savedRecordsCache.find(r => String(r.id) === String(id));
 
@@ -2568,6 +2612,12 @@
 
       if (!rec) {
         showToast('ไม่สามารถโหลดข้อมูลรายการคำนวณได้', 'error');
+        return;
+      }
+
+      // ตรวจสอบสิทธิ์ความเป็นเจ้าของข้อมูล
+      if (rec.user_id && String(rec.user_id) !== String(currentUser.id) && currentUser.role !== 'admin') {
+        showToast('❌ คุณสามารถเรียกดูได้เฉพาะแบบคำนวณของตนเองเท่านั้น', 'error');
         return;
       }
 
@@ -2643,6 +2693,16 @@
   }
 
   async function deleteRecordById(id) {
+    if (!currentUser || currentUser.role === 'guest' || !currentUser.id) {
+      showToast('⚠️ กรุณาเข้าสู่ระบบก่อน', 'warning');
+      return;
+    }
+    let rec = savedRecordsCache.find(r => String(r.id) === String(id));
+    if (rec && rec.user_id && String(rec.user_id) !== String(currentUser.id) && currentUser.role !== 'admin') {
+      showToast('❌ คุณสามารถลบได้เฉพาะรายการของตนเองเท่านั้น', 'error');
+      return;
+    }
+
     if (!confirm('คุณต้องการลบรายการคำนวณภาษีนี้ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้')) return;
     try {
       // 1. Delete from LocalStorage
@@ -2653,7 +2713,7 @@
       if (window.SupabaseService && SupabaseService.isConfigured()) {
         try {
           if (typeof id === 'number' || !isNaN(Number(id))) {
-            await SupabaseService.deleteTaxRecord(Number(id));
+            await SupabaseService.deleteTaxRecord(Number(id), Number(currentUser.id));
           }
         } catch (supaErr) {
           console.warn('Supabase delete record note:', supaErr);
