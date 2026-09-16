@@ -301,17 +301,44 @@
     }
   }
 
+  function highlightRequiredIncomeInput() {
+    // 1. นำทางกลับไปยังขั้นตอนที่ 1 เสมอ
+    goToStep(1, true);
+
+    // 2. ค้นหาช่องกรอกข้อมูลรายได้แรกตามประเภทผู้เสียภาษี
+    const targetInput = taxpayerType === 'individual'
+      ? document.getElementById('inc_40_1')
+      : document.getElementById('corp_sales_revenue');
+
+    if (!targetInput) return;
+
+    // 3. เลื่อนหน้าจอไปยังช่องกรอกข้อมูลอย่างนุ่มนวลและโฟกัส
+    setTimeout(() => {
+      targetInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      targetInput.focus();
+
+      // 4. แสดงกรอบสีแดงเรืองแสงและเอฟเฟกต์กระตุกเบา ๆ (Bounce)
+      targetInput.classList.remove('input-required-bounce');
+      void targetInput.offsetWidth; // trigger DOM reflow เพื่อรีสตาร์ตแอนิเมชัน
+      targetInput.classList.add('input-required-bounce');
+    }, 80);
+
+    // 5. ปลดกรอบสีแดงออกทันทีเมื่อผู้ใช้เริ่มพิมพ์ตัวเลข
+    const clearHighlight = () => {
+      targetInput.classList.remove('input-required-bounce');
+      targetInput.removeEventListener('input', clearHighlight);
+    };
+    targetInput.addEventListener('input', clearHighlight);
+  }
+
   function goToStep(targetStep, force = false) {
     if (targetStep < 1 || targetStep > 3) return;
 
     if (!force && targetStep > activeStep) {
       if (!hasFirstStepData()) {
         showToast('กรุณากรอกข้อมูลรายได้ในขั้นตอนที่ 1 ก่อนเข้าสู่ขั้นตอนถัดไป', 'error');
-        if (taxpayerType === 'individual') {
-          document.getElementById('inc_40_1')?.focus();
-        } else {
-          document.getElementById('corp_sales_revenue')?.focus();
-        }
+        if (window.SoundEngine) SoundEngine.play('alert');
+        highlightRequiredIncomeInput();
         return;
       }
 
@@ -2123,6 +2150,8 @@
 
     if (!hasFirstStepData()) {
       showToast('กรุณากรอกข้อมูลรายได้หรือยอดขายในขั้นตอนที่ 1 ก่อนทำการบันทึก', 'error');
+      if (window.SoundEngine) SoundEngine.play('alert');
+      highlightRequiredIncomeInput();
       return;
     }
 
@@ -3256,6 +3285,8 @@
         if (stepNum > maxUnlockedStep) {
           if (!hasFirstStepData()) {
             showToast('กรุณากรอกข้อมูลรายได้ในขั้นตอนที่ 1 ก่อน', 'error');
+            if (window.SoundEngine) SoundEngine.play('alert');
+            highlightRequiredIncomeInput();
           } else {
             showToast('กรุณากรอกข้อมูลขั้นตอนก่อนหน้าให้ครบถ้วนก่อน', 'error');
           }
@@ -3403,7 +3434,8 @@
     document.getElementById('btn-calculate-now')?.addEventListener('click', async () => {
       if (!hasFirstStepData()) {
         showToast('กรุณากรอกข้อมูลรายได้ในขั้นตอนที่ 1 ก่อนคำนวณภาษี', 'error');
-        goToStep(1);
+        if (window.SoundEngine) SoundEngine.play('alert');
+        highlightRequiredIncomeInput();
         return;
       }
       goToStep(3);
