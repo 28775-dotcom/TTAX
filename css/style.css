@@ -1389,14 +1389,244 @@ body.dark-mode .input-control.input-required-bounce {
   line-height: 1.5;
 }
 
+/* ==========================================================================
+   OFFICIAL P.N.D. TAX CALCULATION & PRINT SHEET STYLES
+   ========================================================================== */
+.pnd-sheet-container {
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: var(--radius-md);
+  padding: 2.25rem 2.5rem;
+  color: #1E293B;
+  font-family: 'Sarabun', 'Prompt', sans-serif;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.pnd-doc-header {
+  border-bottom: 2.5px solid #D97706;
+  padding-bottom: 1.25rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+
+.pnd-doc-title-box h2 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0 0 0.35rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pnd-doc-title-box p {
+  font-size: 0.88rem;
+  color: #64748B;
+  margin: 0;
+}
+
+.pnd-doc-badge-year {
+  background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+  border: 1.5px solid #F59E0B;
+  color: #92400E;
+  padding: 0.4rem 0.9rem;
+  border-radius: var(--radius-full);
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.pnd-taxpayer-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem 1.5rem;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: var(--radius-sm);
+  padding: 0.85rem 1.15rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.86rem;
+}
+
+.pnd-meta-item {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.pnd-meta-lbl {
+  color: #64748B;
+  font-weight: 500;
+}
+
+.pnd-meta-val {
+  color: #0F172A;
+  font-weight: 600;
+}
+
+.pnd-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1E3A8A;
+  border-left: 4px solid #F59E0B;
+  padding-left: 0.6rem;
+  margin: 1.5rem 0 0.75rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pnd-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1.25rem;
+  font-size: 0.85rem;
+}
+
+.pnd-table th,
+.pnd-table td {
+  border: 1px solid #CBD5E1;
+  padding: 0.55rem 0.75rem;
+}
+
+.pnd-table th {
+  background: #F1F5F9;
+  font-weight: 600;
+  color: #334155;
+  text-align: left;
+}
+
+.pnd-table th.tar,
+.pnd-table td.tar {
+  text-align: right;
+}
+
+.pnd-table th.tac,
+.pnd-table td.tac {
+  text-align: center;
+}
+
+.pnd-table tr.highlight-bracket {
+  background: #FEF3C7;
+  font-weight: 700;
+  border-left: 4px solid #D97706;
+}
+
+.pnd-table tr.total-row {
+  background: #F8FAFC;
+  font-weight: 700;
+}
+
+.pnd-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.pnd-kpi-card {
+  background: #F8FAFC;
+  border: 1px solid #CBD5E1;
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 0.85rem;
+  text-align: center;
+}
+
+.pnd-kpi-card .kpi-lbl {
+  font-size: 0.75rem;
+  color: #64748B;
+  margin-bottom: 0.25rem;
+  display: block;
+}
+
+.pnd-kpi-card .kpi-val {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.pnd-result-card {
+  padding: 1.25rem 1.5rem;
+  border-radius: var(--radius-md);
+  margin-top: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.pnd-result-card.pay-more {
+  background: #FEF2F2;
+  border: 1.5px solid #FCA5A5;
+  color: #991B1B;
+}
+
+.pnd-result-card.refund {
+  background: #ECFDF5;
+  border: 1.5px solid #A7F3D0;
+  color: #065F46;
+}
+
+.pnd-result-card.zero {
+  background: #F8FAFC;
+  border: 1.5px solid #CBD5E1;
+  color: #334155;
+}
+
+.pnd-signature-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 1px dashed #CBD5E1;
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.pnd-signature-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.pnd-signature-line {
+  width: 70%;
+  border-bottom: 1px dotted #94A3B8;
+  margin: 1.75rem 0 0.35rem 0;
+}
+
 @media print {
-  body {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 12mm;
+  }
+  body, html {
     background: #FFF !important;
     color: #000 !important;
   }
-  .site-header, .wizard-nav, .wizard-footer, .guest-notice-bar, .site-footer, .sticky-summary-sidebar, .no-print, .taxpayer-selector-card, .hero-section, .chat-widget, .toast-container, .modal-backdrop {
-    display: none !important;
-  }
+  .site-header,
+  .wizard-nav,
+  .wizard-footer,
+  .guest-notice-bar,
+  .site-footer,
+  .sticky-summary-sidebar,
+  .no-print,
+  .taxpayer-selector-card,
+  .hero-section,
+  .chat-widget,
+  .toast-container,
+  .modal-backdrop,
+  .top-gov-stripe,
+  .deadline-banner,
+  .accounting-workflow-section,
   .main-content {
     display: none !important;
   }
@@ -1404,8 +1634,28 @@ body.dark-mode .input-control.input-required-bounce {
     display: block !important;
     position: static !important;
     width: 100% !important;
+    margin: 0 !important;
     padding: 0 !important;
+    background: #FFF !important;
     color: #000 !important;
+  }
+  .pnd-sheet-container {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    background: #FFF !important;
+  }
+  .pnd-table th {
+    background-color: #F1F5F9 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .pnd-table tr.highlight-bracket {
+    background-color: #FEF3C7 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 }
 

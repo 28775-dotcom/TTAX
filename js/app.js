@@ -3471,9 +3471,418 @@
     document.getElementById('preset-corp-sme')?.addEventListener('click', () => loadPreset('corp_sme'));
     document.getElementById('preset-reset')?.addEventListener('click', () => loadPreset('reset'));
 
+    // =========================================================================
+    // 8. ออกแบบพิมพ์ ภ.ง.ด. และแสดงหน้ารายละเอียดการคิดคำนวณภาษี (P.N.D. Report)
+    // =========================================================================
+
+    function generatePndReportHtml(res, customRecord = null) {
+      if (!res) {
+        recalculate();
+        res = latestResult;
+      }
+      if (!res) return '<div style="padding:2.5rem; text-align:center; color:#64748B;">ยังไม่มีข้อมูลผลการคำนวณภาษี กรุณากรอกข้อมูลในแบบฟอร์มก่อน</div>';
+
+      const isIndividual = customRecord ? (customRecord.taxpayer_type === 'individual') : (taxpayerType === 'individual');
+      const taxYear = customRecord?.tax_year || document.getElementById('global-tax-year')?.value || String(new Date().getFullYear() + 543);
+      const filingYear = parseInt(taxYear, 10) + 1;
+      const now = new Date();
+      const dateFormatted = now.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+      const timeFormatted = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+      const userName = currentUser ? (currentUser.full_name || currentUser.username) : 'ผู้มีเงินได้ (บุคคลทั่วไป)';
+      const formData = getFormData();
+
+      let html = `
+        <div class="pnd-sheet-container">
+          <!-- ส่วนหัวเอกสารทางการ -->
+          <div class="pnd-doc-header">
+            <div class="pnd-doc-title-box">
+              <h2>🏛️ แบบแสดงรายการและรายละเอียดการคำนวณภาษีเงินได้${isIndividual ? 'บุคคลธรรมดา (ภ.ง.ด. 90/91)' : 'นิติบุคคล (ภ.ง.ด. 50)'}</h2>
+              <p>ระบบบริการและคำนวณภาษีอิเล็กทรอนิกส์ e-Tax Portal (คำนวณตามเกณฑ์ประมวลรัษฎากรแห่งประเทศไทย)</p>
+            </div>
+            <div class="pnd-doc-badge-year">
+              ปีภาษี ${taxYear}<br>
+              <span style="font-size:0.75rem; font-weight:normal;">(รอบยื่นแบบ พ.ศ. ${filingYear})</span>
+            </div>
+          </div>
+
+          <!-- ข้อมูลผู้เสียภาษีและวันที่คำนวณ -->
+          <div class="pnd-taxpayer-meta-grid">
+            <div class="pnd-meta-item"><span class="pnd-meta-lbl">ผู้มีเงินได้ / ผู้เสียภาษี:</span> <span class="pnd-meta-val">${userName}</span></div>
+            <div class="pnd-meta-item"><span class="pnd-meta-lbl">ประเภทแบบแสดงรายการ:</span> <span class="pnd-meta-val">${isIndividual ? 'บุคคลธรรมดา (ภ.ง.ด. 90/91)' : 'นิติบุคคล (ภ.ง.ด. 50)'}</span></div>
+            <div class="pnd-meta-item"><span class="pnd-meta-lbl">วันที่และเวลาที่คำนวณ:</span> <span class="pnd-meta-val">${dateFormatted} เวลา ${timeFormatted} น.</span></div>
+            <div class="pnd-meta-item"><span class="pnd-meta-lbl">สถานะการคำนวณ:</span> <span class="pnd-meta-val" style="color:#059669;">✔️ ตรวจสอบตามเกณฑ์ พ.ร.ฎ. และ พ.ร.บ. ครบถ้วน</span></div>
+          </div>
+
+          <!-- สรุปภาพรวม 4 บรรทัดสำคัญ -->
+          <div class="pnd-kpi-strip">
+            <div class="pnd-kpi-card">
+              <span class="kpi-lbl">1. รายรับ/เงินได้รวม</span>
+              <span class="kpi-val">${formatMoney(res.totalIncome || res.totalRevenue || 0)} บาท</span>
+            </div>
+            <div class="pnd-kpi-card">
+              <span class="kpi-lbl">2. หัก ค่าใช้จ่ายตามกฎหมาย</span>
+              <span class="kpi-val" style="color:#DC2626;">-${formatMoney(res.totalExpense || res.totalExpenses || 0)} บาท</span>
+            </div>
+            <div class="pnd-kpi-card">
+              <span class="kpi-lbl">3. หัก ค่าลดหย่อนรวม</span>
+              <span class="kpi-val" style="color:#DC2626;">-${formatMoney(res.totalAllowance || res.donationAllowed || 0)} บาท</span>
+            </div>
+            <div class="pnd-kpi-card">
+              <span class="kpi-lbl">4. เงินได้สุทธิ / กำไรสุทธิ</span>
+              <span class="kpi-val" style="color:#D97706;">${formatMoney(res.netTaxableIncome || res.netTaxableProfit || 0)} บาท</span>
+            </div>
+          </div>
+      `;
+
+      if (isIndividual) {
+        // ตอนที่ 1: รายละเอียดเงินได้และการหักค่าใช้จ่าย
+        html += `
+          <div class="pnd-section-title">
+            <span>ตอนที่ 1: รายละเอียดเงินได้พึงประเมินและค่าใช้จ่าย (มาตรา 40(1) - 40(8))</span>
+            <span style="font-size:0.8rem; font-weight:normal; color:#64748B;">หักค่าใช้จ่ายเหมาตาม พ.ร.ฎ.</span>
+          </div>
+          <table class="pnd-table">
+            <thead>
+              <tr>
+                <th style="width:45%;">ประเภทเงินได้</th>
+                <th class="tar" style="width:20%;">จำนวนเงินได้ (บาท)</th>
+                <th class="tac" style="width:15%;">เกณฑ์หักค่าใช้จ่าย</th>
+                <th class="tar" style="width:20%;">ค่าใช้จ่ายที่หักได้ (บาท)</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        const inc = formData.incomes || {};
+        const exp = res.breakdowns?.autoExpenses || {};
+        let hasIncome = false;
+
+        const incItems = [
+          { name: '40(1) เงินเดือน ค่าจ้าง โบนัส', val: inc.inc_40_1, exp: exp.exp12, rule: '50% (รวม 1-2 ไม่เกิน 1 แสน)' },
+          { name: '40(2) ค่าจ้างทั่วไป ค่านายหน้า ฟรีแลนซ์', val: inc.inc_40_2, exp: 0, rule: 'รวมใน 40(1)' },
+          { name: '40(3) ค่าลิขสิทธิ์ สิทธิบัตร', val: inc.inc_40_3, exp: exp.exp3, rule: '50% (ไม่เกิน 1 แสน)' },
+          { name: '40(4) ดอกเบี้ย เงินปันผล', val: inc.inc_40_4, exp: 0, rule: 'หักไม่ได้' },
+          { name: '40(5) ค่าเช่าทรัพย์สิน อาคาร ที่ดิน ยานพาหนะ', val: (Number(inc.inc_40_5_building)||0)+(Number(inc.inc_40_5_agri)||0)+(Number(inc.inc_40_5_other_land)||0)+(Number(inc.inc_40_5_vehicle)||0)+(Number(inc.inc_40_5_other)||0), exp: exp.exp5, rule: '10% - 30%' },
+          { name: '40(6) วิชาชีพอิสระ (การแพทย์, บัญชี, กฎหมาย ฯลฯ)', val: (Number(inc.inc_40_6_medical)||0)+(Number(inc.inc_40_6_other)||0), exp: exp.exp6, rule: '30% - 60%' },
+          { name: '40(7) รับเหมาที่ผู้รับเหมาจัดหาสัมภาระ', val: inc.inc_40_7, exp: exp.exp7, rule: '60%' },
+          { name: '40(8) ธุรกิจ การพาณิชย์ การขายของออนไลน์', val: inc.inc_40_8, exp: exp.exp8, rule: '60%' }
+        ];
+
+        incItems.forEach(item => {
+          if (item.val && Number(item.val) > 0) {
+            hasIncome = true;
+            html += `
+              <tr>
+                <td><strong>${item.name}</strong></td>
+                <td class="tar">${formatMoney(item.val)}</td>
+                <td class="tac">${item.rule}</td>
+                <td class="tar">${formatMoney(item.exp || 0)}</td>
+              </tr>
+            `;
+          }
+        });
+
+        if (!hasIncome) {
+          html += `<tr><td colspan="4" class="tac" style="color:#94A3B8;">ไม่มีรายการเงินได้ที่บันทึกไว้</td></tr>`;
+        }
+
+        html += `
+              <tr class="total-row">
+                <td><strong>รวมเงินได้พึงประเมินทั้งสิ้น และ รวมค่าใช้จ่ายที่หักได้</strong></td>
+                <td class="tar"><strong>${formatMoney(res.totalIncome)}</strong></td>
+                <td class="tac">—</td>
+                <td class="tar"><strong style="color:#DC2626;">-${formatMoney(res.totalExpense)}</strong></td>
+              </tr>
+              <tr style="background:#EFF6FF;">
+                <td colspan="3"><strong>เงินได้คงเหลือหลังหักค่าใช้จ่าย</strong></td>
+                <td class="tar"><strong style="color:#1D4ED8;">${formatMoney(res.netIncomeAfterExpense)} บาท</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        `;
+
+        // ตอนที่ 2: รายการค่าลดหย่อน
+        html += `
+          <div class="pnd-section-title">
+            <span>ตอนที่ 2: รายการค่าลดหย่อนและสิทธิประโยชน์ทางภาษี</span>
+            <span style="font-size:0.8rem; font-weight:normal; color:#64748B;">ตามประมวลรัษฎากร</span>
+          </div>
+          <table class="pnd-table">
+            <thead>
+              <tr>
+                <th style="width:60%;">รายการสิทธิลดหย่อน</th>
+                <th class="tar" style="width:40%;">จำนวนเงินที่หักลดหย่อนได้ (บาท)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>ค่าลดหย่อนผู้มีเงินได้ (ส่วนบุคคลขั้นพื้นฐาน)</td>
+                <td class="tar">60,000</td>
+              </tr>
+        `;
+
+        const allow = formData.allowances || {};
+        const allowItems = [
+          { name: 'ค่าลดหย่อนคู่สมรส (ไม่มีเงินได้)', val: allow.allow_spouse ? 60000 : 0 },
+          { name: 'ค่าลดหย่อนบุตร (' + (allow.allow_child_count || 0) + ' คน)', val: (Number(allow.allow_child_count)||0) * 30000 },
+          { name: 'ค่าลดหย่อนบิดามารดา', val: ((allow.allow_father ? 30000 : 0) + (allow.allow_mother ? 30000 : 0) + (allow.allow_spouse_father ? 30000 : 0) + (allow.allow_spouse_mother ? 30000 : 0)) },
+          { name: 'เงินสมทบกองทุนประกันสังคม', val: allow.allow_social_security },
+          { name: 'เบี้ยประกันชีวิตทั่วไป', val: allow.allow_life_insurance },
+          { name: 'เบี้ยประกันสุขภาพตนเอง', val: allow.allow_health_insurance },
+          { name: '🌿 กองทุนรวมไทยเพื่อความยั่งยืน (Thai ESG)', val: allow.allow_thai_esg },
+          { name: 'กองทุนรวมเพื่อการเลี้ยงชีพ (RMF)', val: allow.allow_rmf },
+          { name: 'กองทุนรวมเพื่อการออม (SSF)', val: allow.allow_ssf },
+          { name: 'กองทุนสำรองเลี้ยงชีพ / กบข. (PVD/GPF)', val: allow.allow_pvd },
+          { name: 'ดอกเบี้ยเงินกู้ยืมเพื่อซื้อที่อยู่อาศัย', val: allow.allow_home_loan_interest },
+          { name: 'เงินบริจาคเพื่อการศึกษา การกีฬา โรงพยาบาลรัฐ (หักได้ 2 เท่า)', val: allow.allow_donation_education ? Number(allow.allow_donation_education) * 2 : 0 },
+          { name: 'เงินบริจาคทั่วไป / องค์กรสาธารณกุศล', val: allow.allow_donation_general }
+        ];
+
+        allowItems.forEach(item => {
+          if (item.val && Number(item.val) > 0) {
+            html += `
+              <tr>
+                <td>${item.name}</td>
+                <td class="tar">${formatMoney(item.val)}</td>
+              </tr>
+            `;
+          }
+        });
+
+        html += `
+              <tr class="total-row">
+                <td><strong>รวมหักค่าลดหย่อนทั้งสิ้น</strong></td>
+                <td class="tar"><strong style="color:#DC2626;">-${formatMoney(res.totalAllowance)} บาท</strong></td>
+              </tr>
+              <tr style="background:#FEF3C7;">
+                <td><strong>เงินได้สุทธิที่นำไปคำนวณภาษี (Net Taxable Income)</strong></td>
+                <td class="tar"><strong style="color:#92400E; font-size:0.95rem;">${formatMoney(res.netTaxableIncome)} บาท</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        `;
+
+        // ตอนที่ 3: ตารางคำนวณภาษีขั้นบันได 7 ขั้น
+        html += `
+          <div class="pnd-section-title">
+            <span>ตอนที่ 3: ตารางคำนวณภาษีเงินได้ตามขั้นบันไดอัตราก้าวหน้า (0% - 35%)</span>
+            <span style="font-size:0.8rem; font-weight:normal; color:#64748B;">มาตรา 48(1)</span>
+          </div>
+          <table class="pnd-table">
+            <thead>
+              <tr>
+                <th style="width:35%;">ช่วงเงินได้สุทธิ (บาท)</th>
+                <th class="tac" style="width:15%;">อัตราภาษี</th>
+                <th class="tar" style="width:25%;">เงินได้ในขั้น (บาท)</th>
+                <th class="tar" style="width:25%;">ภาษีในขั้นนี้ (บาท)</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        if (res.progressive && res.progressive.bracketResults) {
+          res.progressive.bracketResults.forEach(b => {
+            const isAct = b.isActive && b.taxableAmount > 0;
+            html += `
+              <tr class="${isAct ? 'highlight-bracket' : ''}">
+                <td>${b.label} ${isAct ? '📍 (ฐานปัจจุบัน)' : ''}</td>
+                <td class="tac">${b.ratePercent}</td>
+                <td class="tar">${formatMoney(b.taxableAmount)}</td>
+                <td class="tar"><strong>${formatMoney(b.taxAmount)}</strong></td>
+              </tr>
+            `;
+          });
+        }
+
+        html += `
+              <tr class="total-row">
+                <td colspan="3"><strong>ภาษีที่คำนวณได้ตามวิธีที่ 1 (อัตราก้าวหน้า)</strong></td>
+                <td class="tar"><strong style="color:#0F172A;">${formatMoney(res.progressive?.totalTax || 0)} บาท</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        `;
+
+        // ตอนที่ 4: การเปรียบเทียบวิธีคำนวณ
+        const method2Applicable = res.flat?.isApplicable;
+        html += `
+          <div class="pnd-section-title">
+            <span>ตอนที่ 4: การเปรียบเทียบวิธีคำนวณภาษี (วิธีที่ 1 vs วิธีที่ 2)</span>
+          </div>
+          <table class="pnd-table">
+            <tbody>
+              <tr>
+                <td style="width:60%;"><strong>วิธีที่ 1:</strong> คำนวณตามอัตราภาษีก้าวหน้า</td>
+                <td class="tar" style="width:40%;"><strong>${formatMoney(res.progressive?.totalTax || 0)} บาท</strong></td>
+              </tr>
+              <tr>
+                <td><strong>วิธีที่ 2:</strong> คำนวณอัตราร้อยละ 0.5 ของเงินได้พึงประเมิน 40(2)-(8)</td>
+                <td class="tar">${method2Applicable ? formatMoney(res.flat.flatTax) + ' บาท' : '<span style="color:#64748B;">ไม่เข้าเกณฑ์วิธีที่ 2 (ภาษีไม่ถึง 5,000 บาท)</span>'}</td>
+              </tr>
+              <tr style="background:#F0FDF4;">
+                <td><strong>วิธีที่เลือกใช้ชำระภาษีตามกฎหมาย (ยอดที่สูงกว่า):</strong></td>
+                <td class="tar"><strong style="color:#065F46;">${res.selectedMethod === 'method2' ? 'วิธีที่ 2 (ร้อยละ 0.5)' : 'วิธีที่ 1 (อัตราก้าวหน้า)'} = ${formatMoney(res.taxPayableBeforeWht)} บาท</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        `;
+
+      } else {
+        // นิติบุคคล
+        html += `
+          <div class="pnd-section-title">
+            <span>ตอนที่ 1: สรุปรายได้และค่าใช้จ่ายของนิติบุคคล</span>
+            <span style="font-size:0.8rem; font-weight:normal; color:#64748B;">ตามรอบระยะเวลาบัญชี</span>
+          </div>
+          <table class="pnd-table">
+            <tbody>
+              <tr>
+                <td style="width:60%;">รายได้จากการขายสินค้าและบริการ</td>
+                <td class="tar" style="width:40%;">${formatMoney(formData.revenueData?.corp_sales_revenue || 0)} บาท</td>
+              </tr>
+              <tr>
+                <td>รายได้อื่น ๆ</td>
+                <td class="tar">${formatMoney(formData.revenueData?.corp_other_revenue || 0)} บาท</td>
+              </tr>
+              <tr class="total-row">
+                <td><strong>รวมรายได้ทั้งสิ้น</strong></td>
+                <td class="tar"><strong>${formatMoney(res.totalRevenue)} บาท</strong></td>
+              </tr>
+              <tr>
+                <td>หัก ต้นทุนขายและต้นทุนบริการ</td>
+                <td class="tar" style="color:#DC2626;">-${formatMoney(formData.expenseData?.corp_cogs || 0)} บาท</td>
+              </tr>
+              <tr>
+                <td>หัก ค่าใช้จ่ายในการขายและบริหาร</td>
+                <td class="tar" style="color:#DC2626;">-${formatMoney(formData.expenseData?.corp_sga || 0)} บาท</td>
+              </tr>
+              <tr class="total-row">
+                <td><strong>รวมรายจ่ายที่หักได้</strong></td>
+                <td class="tar"><strong style="color:#DC2626;">-${formatMoney(res.totalExpenses)} บาท</strong></td>
+              </tr>
+              <tr style="background:#FEF3C7;">
+                <td><strong>กำไรสุทธิเพื่อคำนวณภาษี (Net Taxable Profit)</strong></td>
+                <td class="tar"><strong style="color:#92400E; font-size:0.95rem;">${formatMoney(res.netTaxableProfit)} บาท</strong></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="pnd-section-title">
+            <span>ตอนที่ 2: อัตราภาษีและการคำนวณภาษีเงินได้นิติบุคคล</span>
+          </div>
+          <table class="pnd-table">
+            <tbody>
+              <tr>
+                <td style="width:60%;">เกณฑ์อัตราภาษีที่ใช้</td>
+                <td class="tar" style="width:40%;"><strong>${res.corporateTaxRateLabel || (res.isSME ? 'อัตราก้าวหน้า SME' : 'อัตราทั่วไป 20%')}</strong></td>
+              </tr>
+              <tr class="total-row" style="background:#EFF6FF;">
+                <td><strong>ภาษีเงินได้นิติบุคคลที่คำนวณได้</strong></td>
+                <td class="tar"><strong style="color:#1D4ED8;">${formatMoney(res.totalCorporateTax || res.taxPayableBeforeWht || 0)} บาท</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        `;
+      }
+
+      // ตอนที่ 5 / สรุปสุดท้าย: ภาษีสุทธิ
+      const wht = isIndividual ? (res.withholdingTax || 0) : (res.totalTaxCredits || 0);
+      const finalAmount = res.finalAmount || 0;
+      const isPayMore = res.taxResultType === 'pay_more';
+      const isRefund = res.taxResultType === 'refund';
+
+      let resultCardClass = 'zero';
+      let resultTitle = 'ไม่มีภาษีที่ต้องชำระเพิ่มเติม หรือ ได้รับคืน';
+      if (isPayMore) {
+        resultCardClass = 'pay-more';
+        resultTitle = 'ภาษีที่ต้องชำระเพิ่มเติม (Payable Tax)';
+      } else if (isRefund) {
+        resultCardClass = 'refund';
+        resultTitle = 'ภาษีที่ชำระไว้เกิน มีสิทธิขอคืนได้ (Tax Refund)';
+      }
+
+      html += `
+          <div class="pnd-section-title">
+            <span>สรุปภาระภาษีและการชำระภาษีสุทธิ</span>
+          </div>
+          <table class="pnd-table">
+            <tbody>
+              <tr>
+                <td style="width:60%;">ภาษีที่ต้องเสียตามเกณฑ์ประเมิน</td>
+                <td class="tar" style="width:40%;"><strong>${formatMoney(res.taxPayableBeforeWht || res.totalCorporateTax || 0)} บาท</strong></td>
+              </tr>
+              <tr>
+                <td>หัก ภาษีเงินได้หัก ณ ที่จ่าย / ภาษีจ่ายล่วงหน้า (Tax Credits)</td>
+                <td class="tar" style="color:#059669;"><strong>-${formatMoney(wht)} บาท</strong></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="pnd-result-card ${resultCardClass}">
+            <div>
+              <div style="font-size:0.88rem; font-weight:600;">${isPayMore ? '⚠️ ผลการคำนวณภาษี:' : (isRefund ? '🎉 ผลการคำนวณภาษี:' : '✔️ ผลการคำนวณภาษี:')}</div>
+              <div style="font-size:1.15rem; font-weight:700; margin-top:0.2rem;">${resultTitle}</div>
+            </div>
+            <div style="text-align:right;">
+              <span style="font-size:1.6rem; font-weight:800;">${formatMoney(finalAmount)} บาท</span>
+            </div>
+          </div>
+
+          <!-- ลายเซ็นต์รับรอง -->
+          <div class="pnd-signature-row">
+            <div class="pnd-signature-box">
+              <div class="pnd-signature-line"></div>
+              <div>(ลงชื่อ) ................................................................</div>
+              <div style="color:#64748B;">ผู้มีเงินได้ / กรรมการผู้มีอำนาจลงนาม</div>
+              <div style="font-size:0.75rem; color:#94A3B8;">วันที่ ...... / ...... / ..........</div>
+            </div>
+            <div class="pnd-signature-box">
+              <div class="pnd-signature-line"></div>
+              <div>(ลงชื่อ) ................................................................</div>
+              <div style="color:#64748B;">ผู้คำนวณภาษี / ระบบ TAX PORTAL</div>
+              <div style="font-size:0.75rem; color:#94A3B8;">พิมพ์วันที่ ${dateFormatted}</div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      return html;
+    }
+
+    function openPndPrintModal(customRecord = null) {
+      if (!customRecord && !hasFirstStepData()) {
+        showToast('กรุณากรอกข้อมูลรายได้ในขั้นตอนที่ 1 ก่อนคำนวณภาษีและพิมพ์แบบ', 'error');
+        if (window.SoundEngine) SoundEngine.play('alert');
+        highlightRequiredIncomeInput();
+        return;
+      }
+
+      if (!latestResult && !customRecord) {
+        recalculate();
+      }
+
+      const res = customRecord?.summary_data || customRecord?.summary || latestResult;
+      const reportHtml = generatePndReportHtml(res, customRecord);
+
+      const previewEl = document.getElementById('pnd-preview-sheet');
+      if (previewEl) previewEl.innerHTML = reportHtml;
+
+      const printDocEl = document.getElementById('pnd-print-document');
+      if (printDocEl) printDocEl.innerHTML = reportHtml;
+
+      openModal('modal-pnd-preview');
+      if (window.SoundEngine) SoundEngine.play('modal');
+    }
+
     // 8. Print Buttons
-    document.getElementById('btn-print-summary')?.addEventListener('click', () => window.print());
-    document.getElementById('btn-inspector-print')?.addEventListener('click', () => window.print());
+    document.getElementById('btn-print-summary')?.addEventListener('click', () => openPndPrintModal());
+    document.getElementById('btn-inspector-print')?.addEventListener('click', () => {
+      if (inspectedRecord) openPndPrintModal(inspectedRecord);
+      else openPndPrintModal();
+    });
+    document.getElementById('btn-pnd-modal-print')?.addEventListener('click', () => {
+      window.print();
+    });
 
     // 9. Inspector Modal Buttons
     document.getElementById('btn-inspector-load')?.addEventListener('click', () => {
