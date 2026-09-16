@@ -28,7 +28,7 @@ const I18n = (function() {
 
       // Hero Section
       'hero_title': 'ระบบคำนวณบัญชีและภาษีอัจฉริยะ',
-      'hero_badge': 'ปีภาษี 2567 / 2568 ล่าสุด',
+      'hero_badge': 'ปีภาษี ' + (new Date().getFullYear() + 543) + ' ล่าสุด',
       'hero_desc': 'คำนวณภาษีสะดวกรวดเร็ว ระบบหักค่าใช้จ่ายเหมาให้อัตโนมัติตามกฎหมาย 100% พร้อมเชื่อมต่อฐานข้อมูลคลาวด์ Supabase และออกรายงานภาษีฉบับสมบูรณ์',
       'preset_salary': '👔 ตัวอย่าง: บุคคลธรรมดา (เงินเดือน & Thai ESG)',
       'preset_freelance': '💻 ตัวอย่าง: บุคคลธรรมดา (ฟรีแลนซ์ & กองทุน)',
@@ -141,7 +141,7 @@ const I18n = (function() {
 
       // Hero Section
       'hero_title': 'Smart Accounting & Tax Calculation Engine',
-      'hero_badge': 'Tax Year 2024 / 2025 Latest',
+      'hero_badge': 'Tax Year ' + new Date().getFullYear() + ' Latest',
       'hero_desc': 'Accurate tax computation with 100% automated statutory standard expense deductions, Supabase cloud database synchronization, and complete P.N.D. reporting.',
       'preset_salary': '👔 Demo: Individual (Salary & Thai ESG)',
       'preset_freelance': '💻 Demo: Individual (Freelance & Mutual Funds)',

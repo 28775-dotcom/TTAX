@@ -126,20 +126,20 @@ const SupabaseService = (function() {
     }
   }
 
-  // ซิงค์บันทึกรายการคำนวณภาษีไปยัง Supabase (เฉพาะผู้ใช้ที่เข้าสู่ระบบเท่านั้น)
+  // ซิงค์บันทึกรายการคำนวณภาษีไปยัง Supabase
   async function saveTaxRecord(recordData) {
     const client = getClient();
     if (!client) {
       throw new Error('Supabase client ยังไม่ได้รับการตั้งค่า');
     }
 
-    // นโยบายความเป็นส่วนตัว: คนที่ไม่ได้เข้าระบบจะไม่มีการเก็บข้อมูลใดๆ ทั้งสิ้น
-    if (!recordData || !recordData.user_id || !Number.isInteger(Number(recordData.user_id)) || Number(recordData.user_id) <= 0) {
-      console.warn('saveTaxRecord ถูกปฏิเสธ: ต้องเข้าสู่ระบบก่อนจึงจะสามารถบันทึกข้อมูลภาษีได้');
-      return null;
+    // ในฐานข้อมูล Supabase ตาราง tax_records คอลัมน์ user_id เป็น BIGINT REFERENCES public.users(id)
+    // หาก user_id เป็น string เช่น 'usr_admin', 'usr_guest' หรือไม่ได้มีอยู่ในตาราง users จะทำให้ PostgreSQL คืนค่า 400
+    // จึงทำการตรวจสอบให้แน่ชัด หากเป็นตัวเลขให้ส่งเป็น BigInt หากไม่ใช่ให้เป็น null
+    let validUserId = null;
+    if (recordData.user_id && Number.isInteger(Number(recordData.user_id)) && Number(recordData.user_id) > 0) {
+      validUserId = Number(recordData.user_id);
     }
-
-    const validUserId = Number(recordData.user_id);
 
     const payload = {
       user_id: validUserId,
@@ -151,7 +151,7 @@ const SupabaseService = (function() {
       allowance_data: recordData.allowance_data || {},
       summary_data: {
         ...(recordData.summary_data || {}),
-        user_identifier: validUserId,
+        user_identifier: recordData.user_id || 'guest',
         user_name: recordData.user_name || ''
       },
       net_tax: Number(recordData.summary_data?.netTaxPayable || recordData.summary_data?.finalAmount || recordData.summary_data?.taxPayableBeforeWht || recordData.net_tax || 0),
@@ -174,22 +174,21 @@ const SupabaseService = (function() {
     return data && data[0] ? data[0] : null;
   }
 
-  // ดึงรายการคำนวณภาษีจาก Supabase เฉพาะของตนเองเท่านั้น (ผู้ไม่ได้เข้าระบบจะได้ array ว่าง)
+  // ดึงรายการคำนวณภาษีทั้งหมดจาก Supabase
   async function fetchTaxRecords(userId = null) {
     const client = getClient();
     if (!client) return [];
 
-    // ความปลอดภัยขั้นเด็ดขาด: คนที่ไม่ได้เข้าระบบ หรือระบุ userId ไม่ถูกต้อง จะไม่ได้รับข้อมูลใดๆ
-    if (!userId || !Number.isInteger(Number(userId)) || Number(userId) <= 0) {
-      return [];
-    }
-
-    const { data, error } = await client
+    let query = client
       .from('tax_records')
       .select('*')
-      .eq('user_id', Number(userId))
       .order('updated_at', { ascending: false });
 
+    if (userId && Number.isInteger(Number(userId)) && Number(userId) > 0) {
+      query = query.eq('user_id', Number(userId));
+    }
+
+    const { data, error } = await query;
     if (error) {
       console.warn('Supabase fetch records warning:', error);
       return [];
@@ -197,21 +196,15 @@ const SupabaseService = (function() {
     return data || [];
   }
 
-  // ลบรายการภาษีใน Supabase (ต้องเป็นเจ้าของรายการเท่านั้น)
-  async function deleteTaxRecord(id, userId = null) {
+  // ลบรายการภาษีใน Supabase
+  async function deleteTaxRecord(id) {
     const client = getClient();
-    if (!client || !id) return false;
-
-    if (!userId || !Number.isInteger(Number(userId)) || Number(userId) <= 0) {
-      console.warn('deleteTaxRecord ถูกปฏิเสธ: ต้องระบุ userId ของเจ้าของรายการ');
-      return false;
-    }
+    if (!client) return false;
 
     const { error } = await client
       .from('tax_records')
       .delete()
-      .eq('id', id)
-      .eq('user_id', Number(userId));
+      .eq('id', id);
 
     if (error) {
       console.error('Supabase delete error:', error);
@@ -257,7 +250,7 @@ const SupabaseService = (function() {
       username: userProfile.username || (userProfile.email ? userProfile.email.split('@')[0] : 'user_' + Date.now()),
       email: userProfile.email || null,
       full_name: userProfile.full_name || '',
-      password_hash: userProfile.password || userProfile.password_hash || '$2y$10$local_hash_placeholder',
+      password_hash: userProfile.password_hash || '$2y$10$local_hash_placeholder',
       tax_id: userProfile.tax_id || '',
       phone: userProfile.phone || '',
       company_name: userProfile.company_name || '',

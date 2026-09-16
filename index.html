@@ -35,13 +35,13 @@
         <label class="tax-year-header-wrap" for="global-tax-year">
           <span data-i18n="nav_tax_year">ปีภาษี</span>
           <select id="global-tax-year" class="input-control tax-year-select" aria-label="ปีภาษี">
-            <option value="2566">2566</option>
-            <option value="2567" selected>2567</option>
+            <option value="2567">2567</option>
             <option value="2568">2568</option>
+            <option value="2569" selected>2569</option>
+            <option value="2570">2570</option>
           </select>
         </label>
         <button type="button" id="btn-toggle-theme" class="btn btn-secondary btn-sm" title="สลับโหมดมืด/สว่าง" aria-label="Dark Mode">🌙</button>
-        <button type="button" id="btn-open-saved-header" class="btn btn-secondary btn-sm" title="ข้อมูลภาษีที่บันทึกไว้ของฉัน">📂 <span data-i18n="btn_saved_records">ข้อมูลภาษีที่บันทึกไว้</span></button>
         <button type="button" id="btn-open-settings" class="btn btn-secondary btn-sm" title="ตั้งค่าระบบ / Settings" aria-label="Settings">⚙️ <span data-i18n="btn_settings">ตั้งค่า</span></button>
         <div id="header-user-section">
           <button id="btn-open-login" class="btn btn-secondary btn-sm" data-i18n="btn_login">🔑 เข้าสู่ระบบ</button>
@@ -59,20 +59,41 @@
   <!-- แถบกำหนดการยื่นภาษี (Tax Filing Deadlines Banner) -->
   <div class="deadline-banner" id="deadline-banner">
     <div class="deadline-banner-content">
-      <div class="deadline-icon">📅</div>
-      <div class="deadline-text">
-        <h3>กำหนดการยื่นภาษี ปี 2567 (รอบ พ.ศ. 2568)</h3>
-        <div class="deadline-items">
-          <div class="deadline-item">
-            <span class="deadline-label">บุคคลธรรมดา (ภ.ง.ด. 90/91):</span>
-            <span class="deadline-date">1 - 31 มีนาคม 2568</span>
-            <span class="deadline-status" id="deadline-status-individual">📍 เหลือเวลา 6 เดือน</span>
+      <div class="deadline-header-row">
+        <div class="deadline-title-group">
+          <span class="deadline-icon" aria-hidden="true">📅</span>
+          <div>
+            <h3 id="deadline-banner-title">กำหนดการยื่นภาษี ปีภาษี <span id="banner-tax-year">2569</span> (รอบยื่นแบบ พ.ศ. <span id="banner-filing-year">2570</span>)</h3>
+            <p class="deadline-subtitle" id="deadline-banner-sub">อัปเดตตามวันและเวลาจริงของกรมสรรพากรแห่งประเทศไทย</p>
           </div>
-          <div class="deadline-item">
-            <span class="deadline-label">นิติบุคคล (ภ.ง.ด. 50):</span>
-            <span class="deadline-date">31 พฤษภาคม 2568</span>
-            <span class="deadline-status" id="deadline-status-corporate">📍 เหลือเวลา 8 เดือน</span>
+        </div>
+        <div class="deadline-live-clock" id="deadline-live-clock" title="วันและเวลาปัจจุบันตามจริง">
+          <span class="live-pulse-dot" aria-hidden="true"></span>
+          <span class="clock-label">เวลาปัจจุบัน:</span>
+          <span id="realtime-clock-display">กำลังเชื่อมต่อเวลาจริง...</span>
+        </div>
+      </div>
+      <div class="deadline-items" id="deadline-items-grid">
+        <div class="deadline-item" id="item-deadline-individual">
+          <div class="deadline-item-info">
+            <span class="deadline-label">👤 บุคคลธรรมดา (ภ.ง.ด. 90/91):</span>
+            <span class="deadline-date" id="deadline-date-individual">1 ม.ค. - 31 มี.ค. 2570 (e-Filing ถึง 8 เม.ย.)</span>
           </div>
+          <span class="deadline-status" id="deadline-status-individual">📍 กำลังคำนวณ...</span>
+        </div>
+        <div class="deadline-item" id="item-deadline-corporate">
+          <div class="deadline-item-info">
+            <span class="deadline-label">🏢 นิติบุคคล (ภ.ง.ด. 50):</span>
+            <span class="deadline-date" id="deadline-date-corporate">ภายใน 31 พ.ค. 2570 (150 วัน)</span>
+          </div>
+          <span class="deadline-status" id="deadline-status-corporate">📍 กำลังคำนวณ...</span>
+        </div>
+        <div class="deadline-item deadline-item-midyear" id="item-deadline-midyear">
+          <div class="deadline-item-info">
+            <span class="deadline-label">⏱️ ภาษีครึ่งปี (ภ.ง.ด. 94/51):</span>
+            <span class="deadline-date" id="deadline-date-midyear">1 ก.ค. - 30 ก.ย. 2569</span>
+          </div>
+          <span class="deadline-status" id="deadline-status-midyear">📍 กำลังคำนวณ...</span>
         </div>
       </div>
     </div>
@@ -85,7 +106,7 @@
         <div class="hero-text">
           <h2>
             <span data-i18n="hero_title">ระบบคำนวณบัญชีและภาษีอัจฉริยะ</span>
-            <span class="hero-badge-year" data-i18n="hero_badge">ปีภาษี 2567 / 2568 ล่าสุด</span>
+            <span class="hero-badge-year" data-i18n="hero_badge">ปีภาษี 2569 ล่าสุด</span>
           </h2>
           <p data-i18n="hero_desc">คำนวณภาษีสะดวกรวดเร็ว ระบบหักค่าใช้จ่ายเหมาให้อัตโนมัติตามกฎหมาย 100% พร้อมเชื่อมต่อฐานข้อมูลคลาวด์ Supabase และออกรายงานภาษีฉบับสมบูรณ์</p>
           
@@ -1856,9 +1877,10 @@
           <div class="form-group" style="margin-bottom:1.25rem;">
             <label class="form-label" for="save-tax-year">ปีภาษี</label>
             <select id="save-tax-year" class="input-control">
-              <option value="2566">2566</option>
               <option value="2567">2567</option>
               <option value="2568">2568</option>
+              <option value="2569" selected>2569</option>
+              <option value="2570">2570</option>
             </select>
           </div>
           <button type="submit" class="btn btn-primary" style="width:100%;">ยืนยันการบันทึก</button>
