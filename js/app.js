@@ -19,6 +19,11 @@
   let savedRecordsCache = [];
   let adminReplyTicketId = null;
 
+  // ตรวจสอบว่าผู้ใช้เข้าสู่ระบบเป็นสมาชิกจริงหรือไม่ (ไม่ใช่ Guest)
+  function isUserLoggedIn() {
+    return !!(currentUser && currentUser.id && currentUser.role !== 'guest' && !String(currentUser.id).startsWith('usr_guest_'));
+  }
+
   // DOM Elements (3 Steps)
   const stepPanels = {
     1: document.getElementById('panel-step1'),
@@ -472,6 +477,8 @@
   let lastAutoSavedHash = '';
 
   async function autoSaveCalculatedRecord() {
+    // ไม่อนุญาตให้บันทึกข้อมูลใดๆ หากยังไม่ได้เข้าสู่ระบบ
+    if (!isUserLoggedIn()) return;
     if (!hasFirstStepData() || !latestResult) return;
 
     const income = Number(latestResult.totalIncome || latestResult.totalRevenue || 0);
@@ -839,9 +846,23 @@
   function updateAuthUI() {
     const userContainer = document.getElementById('header-user-section');
     const guestNotice = document.getElementById('guest-notice-bar');
+    const btnSaveSidebar = document.getElementById('btn-save-record');
+    const btnSaveStep3 = document.getElementById('btn-save-record-step3');
+    const btnViewStep3 = document.getElementById('btn-view-saved-step3');
 
-    if (currentUser) {
+    if (isUserLoggedIn()) {
       if (guestNotice) guestNotice.style.display = 'none';
+      if (btnSaveSidebar) {
+        btnSaveSidebar.innerHTML = '💾 บันทึกข้อมูลภาษีชุดนี้';
+        btnSaveSidebar.title = 'บันทึกข้อมูลภาษีชุดนี้';
+      }
+      if (btnSaveStep3) {
+        btnSaveStep3.innerHTML = '💾 บันทึกข้อมูลชุดนี้';
+        btnSaveStep3.title = 'บันทึกข้อมูลชุดนี้';
+      }
+      if (btnViewStep3) {
+        btnViewStep3.title = 'ดูข้อมูลภาษีที่บันทึกไว้ของฉัน';
+      }
       if (userContainer) {
 
         let avatarMarkup = '';
@@ -882,6 +903,17 @@
       }
     } else {
       if (guestNotice) guestNotice.style.display = 'flex';
+      if (btnSaveSidebar) {
+        btnSaveSidebar.innerHTML = '🔒 บันทึกข้อมูลภาษีชุดนี้ <small style="opacity:0.85; font-size:0.75rem;">(ต้องเข้าสู่ระบบ)</small>';
+        btnSaveSidebar.title = '🔒 กรุณาเข้าสู่ระบบก่อนทำการบันทึกข้อมูล';
+      }
+      if (btnSaveStep3) {
+        btnSaveStep3.innerHTML = '🔒 บันทึกข้อมูลชุดนี้ <small style="opacity:0.85; font-size:0.75rem;">(ต้องเข้าสู่ระบบ)</small>';
+        btnSaveStep3.title = '🔒 กรุณาเข้าสู่ระบบก่อนทำการบันทึกข้อมูล';
+      }
+      if (btnViewStep3) {
+        btnViewStep3.title = '🔒 กรุณาเข้าสู่ระบบก่อนดูข้อมูลที่บันทึกไว้';
+      }
       if (userContainer) {
         userContainer.innerHTML = `
           <button id="btn-open-login" class="btn btn-secondary btn-sm">🔑 เข้าสู่ระบบ</button>
@@ -1070,9 +1102,16 @@
     try {
       const savedUser = localStorage.getItem(STORAGE_KEY_CURRENT_USER);
       if (savedUser) {
-        currentUser = JSON.parse(savedUser);
-        updateAuthUI();
-        return;
+        const parsed = JSON.parse(savedUser);
+        if (parsed && parsed.role !== 'guest' && !String(parsed.id).startsWith('usr_guest_')) {
+          currentUser = parsed;
+          updateAuthUI();
+          return;
+        } else {
+          // ล้าง session ของ guest เดิมที่เคยตกค้างในเบราว์เซอร์
+          localStorage.removeItem(STORAGE_KEY_CURRENT_USER);
+          currentUser = null;
+        }
       }
     } catch (e) { /* ignore */ }
 
@@ -2134,18 +2173,13 @@
   // =========================================================================
 
   async function handleSaveRecord() {
-    if (!currentUser) {
-      // Auto-assign guest user so calculation can be saved without mandatory login barrier
-      currentUser = {
-        id: 'usr_guest_' + Date.now(),
-        full_name: 'ผู้ใช้งานทั่วไป (Guest)',
-        role: 'guest',
-        email: ''
-      };
-      try {
-        localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
-        updateAuthUI();
-      } catch (e) {}
+    // ผู้ใช้ที่ไม่ได้เข้าสู่ระบบ จะไม่สามารถบันทึกข้อมูลใดๆ ได้
+    if (!isUserLoggedIn()) {
+      showToast('🔒 ไม่สามารถบันทึกข้อมูลได้: กรุณาเข้าสู่ระบบก่อนทำการบันทึกข้อมูลภาษี', 'warning');
+      if (window.SoundEngine) SoundEngine.play('alert');
+      showAuthTab('login');
+      openModal('modal-auth');
+      return;
     }
 
     if (!hasFirstStepData()) {
@@ -2174,6 +2208,14 @@
 
   async function submitSaveRecord(e) {
     e.preventDefault();
+    if (!isUserLoggedIn()) {
+      showToast('🔒 ไม่สามารถบันทึกข้อมูลได้: กรุณาเข้าสู่ระบบก่อนทำการบันทึกข้อมูลภาษี', 'warning');
+      if (window.SoundEngine) SoundEngine.play('alert');
+      closeModal('modal-save-record');
+      showAuthTab('login');
+      openModal('modal-auth');
+      return;
+    }
     const formData = getFormData();
     const titlePrompt = document.getElementById('save-title').value.trim();
     const taxYear = document.getElementById('save-tax-year').value || String(new Date().getFullYear() + 543);
@@ -2275,6 +2317,13 @@
   }
 
   async function openSavedRecordsModal() {
+    if (!isUserLoggedIn()) {
+      showToast('🔒 กรุณาเข้าสู่ระบบเพื่อดูข้อมูลภาษีที่บันทึกไว้ของคุณ', 'warning');
+      if (window.SoundEngine) SoundEngine.play('alert');
+      showAuthTab('login');
+      openModal('modal-auth');
+      return;
+    }
     openModal('modal-saved-records');
     const listContainer = document.getElementById('saved-records-list');
     listContainer.innerHTML = '<p style="text-align:center; color:#92400E; padding:1.5rem;">⏳ กำลังโหลดข้อมูลภาษีที่บันทึกไว้...</p>';
@@ -2672,6 +2721,12 @@
   }
 
   async function deleteRecordById(id) {
+    if (!isUserLoggedIn()) {
+      showToast('🔒 กรุณาเข้าสู่ระบบก่อนจัดการหรือลบข้อมูล', 'warning');
+      if (window.SoundEngine) SoundEngine.play('alert');
+      openModal('modal-auth');
+      return;
+    }
     if (!confirm('คุณต้องการลบรายการคำนวณภาษีนี้ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้')) return;
     try {
       // 1. Delete from LocalStorage

@@ -343,6 +343,23 @@
 
     // One-Click Cloud Sync Button
     document.getElementById('btn-sync-supabase-now')?.addEventListener('click', async () => {
+      let currentUser = null;
+      try {
+        const saved = localStorage.getItem('tax_portal_current_user');
+        if (saved) currentUser = JSON.parse(saved);
+      } catch (e) {}
+
+      if (!currentUser || currentUser.role === 'guest' || !currentUser.id || String(currentUser.id).startsWith('usr_guest_')) {
+        notify('🔒 คุณยังไม่ได้เข้าสู่ระบบ ไม่สามารถซิงค์หรือบันทึกข้อมูลภาษีได้ กรุณาเข้าสู่ระบบก่อน', 'warning');
+        const authModal = document.getElementById('modal-auth');
+        if (authModal) {
+          authModal.classList.add('open');
+          const tabLogin = document.getElementById('tab-login-btn');
+          if (tabLogin) tabLogin.click();
+        }
+        return;
+      }
+
       if (!SupabaseService.isConfigured()) {
         notify('กรุณากรอก Supabase Project URL และ Key และบันทึกก่อนทำการซิงค์', 'warning');
         return;
