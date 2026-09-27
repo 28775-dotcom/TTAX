@@ -3214,10 +3214,15 @@
       indDateEl.textContent = `1 ม.ค. - 31 มี.ค. ${filingYearBE} (e-Filing ถึง 8 เม.ย.)`;
     }
     const indStatusEl = document.getElementById('deadline-status-individual');
+    const indItemEl = document.getElementById('item-deadline-individual');
     if (indStatusEl) {
       const res = formatDeadlineCountdown(indDeadlineDate, now);
       indStatusEl.textContent = res.text;
       indStatusEl.className = res.cls;
+      if (indItemEl) {
+        if (res.cls.includes('urgent')) indItemEl.classList.add('urgent');
+        else indItemEl.classList.remove('urgent');
+      }
     }
 
     // 2. นิติบุคคล ภ.ง.ด. 50 (ภายใน 150 วันนับแต่วันสิ้นรอบบัญชี 31 พ.ค.)
@@ -3227,10 +3232,15 @@
       corpDateEl.textContent = `ภายใน 31 พ.ค. ${filingYearBE} (150 วัน)`;
     }
     const corpStatusEl = document.getElementById('deadline-status-corporate');
+    const corpItemEl = document.getElementById('item-deadline-corporate');
     if (corpStatusEl) {
       const res = formatDeadlineCountdown(corpDeadlineDate, now);
       corpStatusEl.textContent = res.text;
       corpStatusEl.className = res.cls;
+      if (corpItemEl) {
+        if (res.cls.includes('urgent')) corpItemEl.classList.add('urgent');
+        else corpItemEl.classList.remove('urgent');
+      }
     }
 
     // 3. ภาษีครึ่งปี ภ.ง.ด. 94 / 51 (ยื่นภายใน 30 ก.ย. ของปีภาษีนั้น)
@@ -3241,10 +3251,15 @@
       midDateEl.textContent = `1 ก.ค. - 30 ก.ย. ${taxYearNum} (ครึ่งปี)`;
     }
     const midStatusEl = document.getElementById('deadline-status-midyear');
+    const midItemEl = document.getElementById('item-deadline-midyear');
     if (midStatusEl) {
       const res = formatDeadlineCountdown(midyearDeadlineDate, now);
       midStatusEl.textContent = res.text;
       midStatusEl.className = res.cls;
+      if (midItemEl) {
+        if (res.cls.includes('urgent')) midItemEl.classList.add('urgent');
+        else midItemEl.classList.remove('urgent');
+      }
     }
   }
 
