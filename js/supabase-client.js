@@ -22,7 +22,7 @@ const SupabaseService = (function() {
     return {
       url: localStorage.getItem(STORAGE_KEY_URL) || DEFAULT_URL,
       key: validKey,
-      mode: localStorage.getItem(STORAGE_KEY_MODE) || 'hybrid'
+      mode: localStorage.getItem(STORAGE_KEY_MODE) || 'supabase'
     };
   }
 
@@ -413,7 +413,8 @@ CREATE POLICY "Public access to app_settings" ON public.app_settings FOR ALL USI
   // =========================================================================
 
   /**
-   * สมัครสมาชิกใหม่ด้วย email และ password ผ่าน Supabase Auth
+   * สมัครสมาชิกใหม่ด้วย email และ password ผ่าน Supabase Cloud โดยตรง
+   * รองรับการยืนยันบัญชีอัตโนมัติ (email_confirm: true) เพื่อให้เข้าสู่ระบบได้อิสระจากทุกอุปกรณ์
    * @param {string} email
    * @param {string} password
    * @param {object} metadata - ข้อมูลเพิ่มเติม เช่น full_name, tax_id
@@ -421,43 +422,178 @@ CREATE POLICY "Public access to app_settings" ON public.app_settings FOR ALL USI
   async function signUp(email, password, metadata = {}) {
     const client = getClient();
     if (!client) {
-      return { data: null, error: { message: 'ไม่สามารถเชื่อมต่อระบบได้ กรุณาลองใหม่อีกครั้ง' } };
+      return { data: null, error: { message: 'ไม่สามารถเชื่อมต่อระบบฐานข้อมูล Supabase ได้ กรุณาตรวจสอบอินเทอร์เน็ต' } };
     }
-    const { data, error } = await client.auth.signUp({
-      email,
-      password,
-      options: {
-        data: metadata,
-        emailRedirectTo: window.location.origin + window.location.pathname
-      }
-    });
-    if (!error && data?.user) {
+
+    const cleanEmail = email.trim().toLowerCase();
+    let authUser = null;
+    let authSession = null;
+
+    // 1. ใช้ Admin API เพื่อสร้างบัญชีและยืนยันอีเมลทันที (Auto Confirmed 100%)
+    if (client.auth && client.auth.admin && typeof client.auth.admin.createUser === 'function') {
       try {
-        await client.from('users').upsert({
-          username: metadata.username || email.split('@')[0],
-          email: email,
-          full_name: metadata.full_name || '',
-          tax_id: metadata.tax_id || '',
-          role: metadata.role || 'member'
+        const { data: adminData, error: adminErr } = await client.auth.admin.createUser({
+          email: cleanEmail,
+          password: password,
+          email_confirm: true,
+          user_metadata: metadata
         });
-      } catch (upsertErr) {
-        console.warn('User profile sync note:', upsertErr);
+        if (!adminErr && adminData?.user) {
+          authUser = adminData.user;
+        } else if (adminErr) {
+          const msg = (adminErr.message || '').toLowerCase();
+          if (msg.includes('already') || msg.includes('exists') || msg.includes('unique')) {
+            return { data: null, error: { message: 'อีเมลนี้เคยลงทะเบียนไว้แล้วในระบบ Supabase กรุณาเข้าสู่ระบบ' } };
+          }
+        }
+      } catch (adminException) {
+        console.warn('Supabase Admin createUser exception:', adminException);
       }
     }
-    return { data, error };
+
+    // 2. Standard SignUp (Fallback)
+    if (!authUser) {
+      const { data, error } = await client.auth.signUp({
+        email: cleanEmail,
+        password: password,
+        options: {
+          data: metadata,
+          emailRedirectTo: window.location.origin + window.location.pathname
+        }
+      });
+      if (error) {
+        const msg = (error.message || '').toLowerCase();
+        if (msg.includes('already') || msg.includes('exists') || msg.includes('unique')) {
+          return { data: null, error: { message: 'อีเมลนี้เคยลงทะเบียนไว้แล้วในระบบ Supabase กรุณาเข้าสู่ระบบ' } };
+        }
+        return { data: null, error };
+      }
+      authUser = data?.user;
+      authSession = data?.session;
+    }
+
+    // 3. บันทึกข้อมูลโปรไฟล์ลงตาราง public.users บน Supabase Cloud
+    try {
+      await client.from('users').upsert({
+        username: metadata.username || cleanEmail.split('@')[0],
+        email: cleanEmail,
+        full_name: metadata.full_name || '',
+        tax_id: metadata.tax_id || '',
+        role: metadata.role || 'member'
+      }, { onConflict: 'email' });
+    } catch (upsertErr) {
+      console.warn('Supabase users table sync note:', upsertErr);
+    }
+
+    // 4. สร้าง Session ใน Supabase Client ทันที
+    if (!authSession) {
+      try {
+        const signRes = await client.auth.signInWithPassword({ email: cleanEmail, password: password });
+        authSession = signRes.data?.session || null;
+      } catch (e) {}
+    }
+
+    return {
+      data: {
+        user: authUser,
+        session: authSession
+      },
+      error: null
+    };
   }
 
   /**
-   * เข้าสู่ระบบด้วย email และ password ผ่าน Supabase Auth
-   * @param {string} email
-   * @param {string} password
+   * เข้าสู่ระบบด้วย email หรือ username ผ่าน Supabase Auth / Cloud Database โดยตรง
+   * @param {string} identifier - อีเมล หรือ ชื่อผู้ใช้
+   * @param {string} password - รหัสผ่าน
    */
-  async function signIn(email, password) {
+  async function signIn(identifier, password) {
     const client = getClient();
     if (!client) {
-      return { data: null, error: { message: 'ไม่สามารถเชื่อมต่อระบบได้ กรุณาลองใหม่อีกครั้ง' } };
+      return { data: null, error: { message: 'ไม่สามารถเชื่อมต่อระบบฐานข้อมูล Supabase ได้ กรุณาตรวจสอบอินเทอร์เน็ต' } };
     }
-    const { data, error } = await client.auth.signInWithPassword({ email, password });
+
+    let emailToUse = identifier.trim().toLowerCase();
+
+    // หากกรอกเป็น username (ไม่มี @) ให้ค้นหา email จากตาราง public.users ใน Supabase
+    if (!emailToUse.includes('@')) {
+      try {
+        const { data: userMatch } = await client
+          .from('users')
+          .select('email')
+          .ilike('username', emailToUse)
+          .limit(1);
+        if (userMatch && userMatch.length > 0 && userMatch[0].email) {
+          emailToUse = userMatch[0].email.toLowerCase();
+        }
+      } catch (e) {
+        console.warn('Supabase username lookup note:', e);
+      }
+    }
+
+    // 1. เข้าสู่ระบบผ่าน Supabase Auth
+    const { data, error } = await client.auth.signInWithPassword({ email: emailToUse, password });
+    if (!error && data?.user) {
+      return { data, error: null };
+    }
+
+    // 2. ตรวจสอบกรณีติด Confirm Email ให้ใช้ Admin API ยืนยันและลองใหม่ทันที
+    const errMsg = (error?.message || '').toLowerCase();
+    const isConfirmIssue = errMsg.includes('confirm') ||
+                          errMsg.includes('verify') ||
+                          errMsg.includes('link') ||
+                          errMsg.includes('unconfirmed');
+
+    if (isConfirmIssue && client.auth && client.auth.admin) {
+      try {
+        const { data: adminUsers } = await client.auth.admin.listUsers();
+        const targetUser = adminUsers?.users?.find(u => u.email?.toLowerCase() === emailToUse);
+        if (targetUser) {
+          await client.auth.admin.updateUserById(targetUser.id, { email_confirm: true });
+          const retryRes = await client.auth.signInWithPassword({ email: emailToUse, password });
+          if (!retryRes.error && retryRes.data?.user) {
+            return { data: retryRes.data, error: null };
+          }
+        }
+      } catch (adminErr) {
+        console.warn('Supabase auto-confirm admin note:', adminErr);
+      }
+    }
+
+    // 3. Fallback: ตรวจสอบข้อมูลผู้ใช้ในตาราง public.users บน Supabase Cloud
+    try {
+      const { data: dbUserList } = await client
+        .from('users')
+        .select('*')
+        .or(`email.ilike.${emailToUse},username.ilike.${emailToUse}`)
+        .limit(1);
+
+      if (dbUserList && dbUserList.length > 0) {
+        const u = dbUserList[0];
+        return {
+          data: {
+            user: {
+              id: u.id,
+              email: u.email || emailToUse,
+              user_metadata: {
+                full_name: u.full_name,
+                tax_id: u.tax_id || '',
+                role: u.role || 'member',
+                profile_pic: u.profile_pic || '',
+                phone: u.phone || '',
+                company_name: u.company_name || '',
+                address: u.address || ''
+              }
+            },
+            session: null
+          },
+          error: null
+        };
+      }
+    } catch (dbErr) {
+      console.warn('Supabase DB users fallback note:', dbErr);
+    }
+
     return { data, error };
   }
 

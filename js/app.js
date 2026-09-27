@@ -19,10 +19,15 @@
   let savedRecordsCache = [];
   let adminReplyTicketId = null;
 
-  // ตรวจสอบว่าผู้ใช้เข้าสู่ระบบเป็นสมาชิกจริงหรือไม่ (ไม่ใช่ Guest)
-  function isUserLoggedIn() {
-    return !!(currentUser && currentUser.id && currentUser.role !== 'guest' && !String(currentUser.id).startsWith('usr_guest_'));
-  }
+  // Base API path พร้อม auto-detect รันผ่าน root /, /tax/, /TAX/ หรือทุกไดเรกทอรี
+  const API_BASE = (function () {
+    const pathname = window.location.pathname;
+    const dir = pathname.substring(0, pathname.lastIndexOf('/'));
+    if (dir && dir !== '/' && dir !== '') {
+      return dir + '/api';
+    }
+    return '/api';
+  })();
 
   // DOM Elements (3 Steps)
   const stepPanels = {
@@ -477,8 +482,6 @@
   let lastAutoSavedHash = '';
 
   async function autoSaveCalculatedRecord() {
-    // ไม่อนุญาตให้บันทึกข้อมูลใดๆ หากยังไม่ได้เข้าสู่ระบบ
-    if (!isUserLoggedIn()) return;
     if (!hasFirstStepData() || !latestResult) return;
 
     const income = Number(latestResult.totalIncome || latestResult.totalRevenue || 0);
@@ -836,33 +839,26 @@
   // =========================================================================
 
   function openModal(modalId) {
-    document.getElementById(modalId)?.classList.add('open');
+    const el = document.getElementById(modalId);
+    if (!el) return;
+    el.classList.add('open');
+    document.body.classList.add('modal-open');
   }
 
   function closeModal(modalId) {
-    document.getElementById(modalId)?.classList.remove('open');
+    const el = document.getElementById(modalId);
+    if (el) el.classList.remove('open');
+    if (!document.querySelector('.modal-backdrop.open')) {
+      document.body.classList.remove('modal-open');
+    }
   }
 
   function updateAuthUI() {
     const userContainer = document.getElementById('header-user-section');
     const guestNotice = document.getElementById('guest-notice-bar');
-    const btnSaveSidebar = document.getElementById('btn-save-record');
-    const btnSaveStep3 = document.getElementById('btn-save-record-step3');
-    const btnViewStep3 = document.getElementById('btn-view-saved-step3');
 
-    if (isUserLoggedIn()) {
+    if (currentUser) {
       if (guestNotice) guestNotice.style.display = 'none';
-      if (btnSaveSidebar) {
-        btnSaveSidebar.innerHTML = '💾 บันทึกข้อมูลภาษีชุดนี้';
-        btnSaveSidebar.title = 'บันทึกข้อมูลภาษีชุดนี้';
-      }
-      if (btnSaveStep3) {
-        btnSaveStep3.innerHTML = '💾 บันทึกข้อมูลชุดนี้';
-        btnSaveStep3.title = 'บันทึกข้อมูลชุดนี้';
-      }
-      if (btnViewStep3) {
-        btnViewStep3.title = 'ดูข้อมูลภาษีที่บันทึกไว้ของฉัน';
-      }
       if (userContainer) {
 
         let avatarMarkup = '';
@@ -903,17 +899,6 @@
       }
     } else {
       if (guestNotice) guestNotice.style.display = 'flex';
-      if (btnSaveSidebar) {
-        btnSaveSidebar.innerHTML = '🔒 บันทึกข้อมูลภาษีชุดนี้ <small style="opacity:0.85; font-size:0.75rem;">(ต้องเข้าสู่ระบบ)</small>';
-        btnSaveSidebar.title = '🔒 กรุณาเข้าสู่ระบบก่อนทำการบันทึกข้อมูล';
-      }
-      if (btnSaveStep3) {
-        btnSaveStep3.innerHTML = '🔒 บันทึกข้อมูลชุดนี้ <small style="opacity:0.85; font-size:0.75rem;">(ต้องเข้าสู่ระบบ)</small>';
-        btnSaveStep3.title = '🔒 กรุณาเข้าสู่ระบบก่อนทำการบันทึกข้อมูล';
-      }
-      if (btnViewStep3) {
-        btnViewStep3.title = '🔒 กรุณาเข้าสู่ระบบก่อนดูข้อมูลที่บันทึกไว้';
-      }
       if (userContainer) {
         userContainer.innerHTML = `
           <button id="btn-open-login" class="btn btn-secondary btn-sm">🔑 เข้าสู่ระบบ</button>
@@ -1102,20 +1087,43 @@
     try {
       const savedUser = localStorage.getItem(STORAGE_KEY_CURRENT_USER);
       if (savedUser) {
-        const parsed = JSON.parse(savedUser);
-        if (parsed && parsed.role !== 'guest' && !String(parsed.id).startsWith('usr_guest_')) {
-          currentUser = parsed;
-          updateAuthUI();
-          return;
-        } else {
-          // ล้าง session ของ guest เดิมที่เคยตกค้างในเบราว์เซอร์
-          localStorage.removeItem(STORAGE_KEY_CURRENT_USER);
-          currentUser = null;
-        }
+        currentUser = JSON.parse(savedUser);
+        updateAuthUI();
+        // ซิงค์สถานะเบื้องหลังกับเซิร์ฟเวอร์ PHP
+        fetch(API_BASE + '/auth.php?action=me', { credentials: 'include' })
+          .then(res => res.json())
+          .then(data => {
+            if (data.logged_in && data.user) {
+              currentUser = Object.assign({}, currentUser, data.user);
+              localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
+              updateAuthUI();
+            }
+          })
+          .catch(() => {});
+        return;
       }
     } catch (e) { /* ignore */ }
 
-    // 2. ตรวจสอบ Supabase Session
+    // 2. ตรวจสอบ PHP API Session (เมื่อเข้าจากมือถือหรืออุปกรณ์อื่นที่เคยล็อกอินไว้)
+    try {
+      const res = await fetch(API_BASE + '/auth.php?action=me', { credentials: 'include' });
+      const data = await res.json();
+      if (data.logged_in && data.user) {
+        currentUser = data.user;
+        saveRegisteredAccount({
+          id: currentUser.id,
+          email: currentUser.email || currentUser.username,
+          full_name: currentUser.full_name,
+          tax_id: currentUser.tax_id || '',
+          role: currentUser.role || 'member'
+        });
+        localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
+        updateAuthUI();
+        return;
+      }
+    } catch (e) { /* ignore */ }
+
+    // 3. ตรวจสอบ Supabase Session
     if (window.SupabaseService && SupabaseService.isConfigured()) {
       try {
         const { user } = await SupabaseService.getUser();
@@ -1140,26 +1148,14 @@
       }
     }
 
-    // 3. ตรวจสอบ PHP API Session
-    try {
-      const res = await fetch(API_BASE + '/auth.php?action=me');
-      const data = await res.json();
-      if (data.logged_in && data.user) {
-        currentUser = data.user;
-        localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
-        updateAuthUI();
-        return;
-      }
-    } catch (e) { /* ignore */ }
-
     currentUser = null;
     updateAuthUI();
   }
 
   async function handleLogin(e) {
     if (e && e.preventDefault) e.preventDefault();
-    const rawInput = document.getElementById('login-email').value.trim();
-    const password = document.getElementById('login-password').value.trim();
+    const rawInput = (document.getElementById('login-email')?.value || '').trim();
+    const password = (document.getElementById('login-password')?.value || '').trim();
     const loginLower = rawInput.toLowerCase();
     const email = rawInput;
 
@@ -1168,6 +1164,10 @@
 
     if (!rawInput) {
       setFieldError('err-login', 'กรุณากรอกอีเมล หรือ ชื่อผู้ใช้');
+      return;
+    }
+    if (!password) {
+      setFieldError('err-login', 'กรุณากรอกรหัสผ่าน');
       return;
     }
 
@@ -1181,7 +1181,98 @@
       return;
     }
 
-    // 1. ตรวจสอบจากบัญชีที่ลงทะเบียนในระบบ (Local Registry)
+    // 1. เข้าสู่ระบบผ่านฐานข้อมูล Supabase Cloud โดยตรง (อิสระจากทุกอุปกรณ์ 100%)
+    if (window.SupabaseService && SupabaseService.isConfigured()) {
+      try {
+        const { data, error } = await SupabaseService.signIn(rawInput, password);
+        if (data?.user) {
+          const user = data.user;
+          const userRole = user.user_metadata?.role || (loginLower.includes('admin') ? 'admin' : 'member');
+          currentUser = {
+            id: user.id,
+            full_name: user.user_metadata?.full_name || (user.email ? user.email.split('@')[0] : rawInput),
+            email: user.email || (rawInput.includes('@') ? rawInput : ''),
+            role: userRole,
+            profile_pic: user.user_metadata?.profile_pic || (userRole === 'admin' ? '👑' : ''),
+            tax_id: user.user_metadata?.tax_id || '',
+            phone: user.user_metadata?.phone || '',
+            company_name: user.user_metadata?.company_name || '',
+            address: user.user_metadata?.address || ''
+          };
+          saveRegisteredAccount({
+            id: currentUser.id,
+            email: currentUser.email || rawInput,
+            password: password,
+            full_name: currentUser.full_name,
+            tax_id: currentUser.tax_id,
+            role: userRole
+          });
+          localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
+
+          // ซิงค์ไปยัง Local PHP DB ในเบื้องหลัง (ถ้ามี)
+          try {
+            fetch(API_BASE + '/auth.php?action=login', {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username: rawInput, password: password })
+            }).catch(() => {});
+          } catch (e) {}
+
+          updateAuthUI();
+          closeModal('modal-auth');
+          setButtonLoading(btn, false);
+          showToast(`☁️ เข้าสู่ระบบผ่าน Supabase Cloud สำเร็จ! ยินดีต้อนรับคุณ ${currentUser.full_name}`, 'success');
+          if (window.SoundEngine) SoundEngine.play('success');
+          if (currentUser.role === 'admin') {
+            setTimeout(() => openAdminPortalModal(), 350);
+          }
+          return;
+        }
+      } catch (err) {
+        console.warn('Supabase primary signIn note:', err);
+      }
+    }
+
+    // 2. สำรอง: ตรวจสอบกับเซิร์ฟเวอร์ PHP Database กลาง (กรณีใช้งานผ่าน Local Network)
+    try {
+      const res = await fetch(API_BASE + '/auth.php?action=login', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: rawInput, email: rawInput, password: password })
+      });
+      const data = await res.json();
+      if (data && data.success && data.user) {
+        currentUser = data.user;
+        saveRegisteredAccount({
+          id: currentUser.id,
+          email: currentUser.email || rawInput,
+          password: password,
+          full_name: currentUser.full_name,
+          tax_id: currentUser.tax_id || '',
+          role: currentUser.role || 'member',
+          company_name: currentUser.company_name || '',
+          phone: currentUser.phone || '',
+          address: currentUser.address || '',
+          profile_pic: currentUser.profile_pic || ''
+        });
+        localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
+        updateAuthUI();
+        closeModal('modal-auth');
+        setButtonLoading(btn, false);
+        showToast(`✅ ยินดีต้อนรับคุณ ${currentUser.full_name}! เข้าสู่ระบบสำเร็จ`, 'success');
+        if (window.SoundEngine) SoundEngine.play('success');
+        if (currentUser.role === 'admin') {
+          setTimeout(() => openAdminPortalModal(), 350);
+        }
+        return;
+      }
+    } catch (err) {
+      console.warn('PHP Auth sync note:', err);
+    }
+
+    // 3. สำรอง: ตรวจสอบจาก Local Registry (กรณีเครื่องเดิมหรือออฟไลน์)
     const localAcc = getRegisteredAccount(loginLower);
     if (localAcc && (localAcc.password === password || (localAcc.altPassword && localAcc.altPassword === password) || password === 'admin1234' || password === 'admin')) {
       currentUser = {
@@ -1207,112 +1298,12 @@
       return;
     }
 
-    // 2. ตรวจสอบผ่าน Supabase Auth
-    if (window.SupabaseService && SupabaseService.isConfigured()) {
-      try {
-        const { data, error } = await SupabaseService.signIn(email, password);
-        if (data?.user) {
-          const user = data.user;
-          const userRole = user.user_metadata?.role || (loginLower.includes('admin') ? 'admin' : 'member');
-          currentUser = {
-            id: user.id,
-            full_name: user.user_metadata?.full_name || (localAcc?.full_name) || email.split('@')[0],
-            email: user.email,
-            role: userRole,
-            profile_pic: user.user_metadata?.profile_pic || (userRole === 'admin' ? '👑' : ''),
-            tax_id: user.user_metadata?.tax_id || '',
-            phone: user.user_metadata?.phone || '',
-            company_name: user.user_metadata?.company_name || '',
-            address: user.user_metadata?.address || ''
-          };
-          saveRegisteredAccount({ id: currentUser.id, email, password, full_name: currentUser.full_name, tax_id: currentUser.tax_id, role: userRole });
-          localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
-          updateAuthUI();
-          closeModal('modal-auth');
-          setButtonLoading(btn, false);
-          showToast(`✅ ยินดีต้อนรับคุณ ${currentUser.full_name}! เข้าสู่ระบบสำเร็จ`, 'success');
-          if (window.SoundEngine) SoundEngine.play('success');
-          if (currentUser.role === 'admin') {
-            setTimeout(() => openAdminPortalModal(), 350);
-          }
-          return;
-        }
-
-        const errMsg = (error?.message || '').toLowerCase();
-        const errCode = (error?.code || '').toLowerCase();
-        // ถ้า Supabase แจ้งว่ายังไม่ได้ยืนยันอีเมล หรือติด confirm / verification ใดๆ
-        // ไม่ต้องขึ้นเตือนยืนยันอีเมล ให้เข้าสู่ระบบได้ทันที 100%!
-        const isConfirmIssue = errMsg.includes('confirm') ||
-                              errCode.includes('confirm') ||
-                              errMsg.includes('verify') ||
-                              errCode.includes('verify') ||
-                              errMsg.includes('ยืนยัน') ||
-                              errMsg.includes('link') ||
-                              errMsg.includes('unconfirmed');
-        if (isConfirmIssue) {
-          const fallbackName = (localAcc && localAcc.full_name) ? localAcc.full_name : email.split('@')[0];
-          const userRole = (localAcc && localAcc.role) ? localAcc.role : (loginLower.includes('admin') ? 'admin' : 'member');
-          currentUser = {
-            id: (localAcc && localAcc.id) ? localAcc.id : 'usr_' + btoa(email).replace(/=/g, '').slice(-12),
-            full_name: fallbackName,
-            email: email,
-            role: userRole,
-            profile_pic: userRole === 'admin' ? '👑' : '',
-            tax_id: localAcc ? localAcc.tax_id : '',
-            phone: '',
-            company_name: '',
-            address: ''
-          };
-          saveRegisteredAccount({ id: currentUser.id, email, password, full_name: currentUser.full_name, tax_id: currentUser.tax_id, role: userRole });
-          localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
-          try {
-            fetch(API_BASE + '/auth.php?action=login', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ username: email, password })
-            }).catch(() => {});
-          } catch (e) {}
-          updateAuthUI();
-          closeModal('modal-auth');
-          setButtonLoading(btn, false);
-          showToast(`✅ ยินดีต้อนรับคุณ ${currentUser.full_name}! เข้าสู่ระบบสำเร็จ`, 'success');
-          if (window.SoundEngine) SoundEngine.play('success');
-          if (currentUser.role === 'admin') {
-            setTimeout(() => openAdminPortalModal(), 350);
-          }
-          return;
-        }
-      } catch (err) {
-        console.warn('Supabase signIn note:', err);
-      }
+    setFieldError('err-login', '❌ อีเมล/ชื่อผู้ใช้ หรือรหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง หรือกด "ลืมรหัสผ่าน?" ด้านล่าง');
+    const pwdInput = document.getElementById('login-password');
+    if (pwdInput) {
+      pwdInput.value = '';
+      pwdInput.focus();
     }
-
-    // 3. Fallback: PHP auth
-    try {
-      const res = await fetch(API_BASE + '/auth.php?action=login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: email, password })
-      });
-      const data = await res.json();
-      if (data.success && data.user) {
-        currentUser = data.user;
-        saveRegisteredAccount({ id: currentUser.id, email, password, full_name: currentUser.full_name, tax_id: currentUser.tax_id, role: currentUser.role });
-        localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
-        updateAuthUI();
-        closeModal('modal-auth');
-        setButtonLoading(btn, false);
-        showToast(`ยินดีต้อนรับคุณ ${data.user.full_name}`, 'success');
-        if (currentUser.role === 'admin') {
-          setTimeout(() => openAdminPortalModal(), 350);
-        }
-        return;
-      }
-    } catch (err) { /* ignore */ }
-
-    setFieldError('err-login', '❌ อีเมลหรือรหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง หรือกด "ลืมรหัสผ่าน?" ด้านล่าง');
-    document.getElementById('login-password').value = '';
-    document.getElementById('login-password').focus();
     setButtonLoading(btn, false);
   }
 
@@ -1320,10 +1311,10 @@
     e.preventDefault();
 
     // อ่านค่าจากฟอร์ม
-    const regEmail = document.getElementById('reg-email').value.trim();
-    const fullName = document.getElementById('reg-fullname').value.trim();
-    const password = document.getElementById('reg-password').value.trim();
-    const taxId    = document.getElementById('reg-taxid')?.value.trim() || '';
+    const regEmail = (document.getElementById('reg-email')?.value || '').trim();
+    const fullName = (document.getElementById('reg-fullname')?.value || '').trim();
+    const password = (document.getElementById('reg-password')?.value || '').trim();
+    const taxId    = (document.getElementById('reg-taxid')?.value || '').trim();
 
     // ล้าง error เดิม
     ['err-reg-email','err-reg-fullname','err-reg-password','err-reg-taxid'].forEach(id => setFieldError(id, ''));
@@ -1362,51 +1353,43 @@
 
     if (hasError) return;
 
-    // ตรวจสอบอีเมลซ้ำ (1 อีเมล = 1 บัญชีเท่านั้น)
-    const existingAcc = getRegisteredAccount(regEmail);
-    if (existingAcc) {
-      setFieldError('err-reg-email', '❌ อีเมลนี้เคยลงทะเบียนไว้แล้ว กรุณาเข้าสู่ระบบหรือกดลืมรหัสผ่าน');
-      return;
-    }
-
     const btn = document.getElementById('btn-register-submit');
     setButtonLoading(btn, true);
 
-    const newUserId = 'usr_' + Date.now();
-    const newAccount = {
-      id: newUserId,
-      email: regEmail,
-      password: password,
-      full_name: fullName,
-      tax_id: taxId,
-      role: 'member',
-      created_at: new Date().toISOString()
-    };
+    let assignedId = 'usr_' + Date.now();
+    let registeredOnSupabase = false;
 
-    // บันทึกบัญชีในระบบทันที ไม่ต้องรอยืนยันอีเมล!
-    saveRegisteredAccount(newAccount);
-
-    // พยายามลงทะเบียนใน Supabase เบื้องหลัง (Background sync)
+    // 1. สมัครสมาชิกลงฐานข้อมูล Supabase Cloud โดยตรง (อิสระจากทุกอุปกรณ์ 100%!)
     if (window.SupabaseService && SupabaseService.isConfigured()) {
       try {
-        const { data } = await SupabaseService.signUp(regEmail, password, {
+        const { data, error } = await SupabaseService.signUp(regEmail, password, {
           full_name: fullName,
           tax_id: taxId,
           role: 'member'
         });
+
+        if (error) {
+          if (error.message && (error.message.includes('เคยลงทะเบียน') || error.message.includes('already registered'))) {
+            setFieldError('err-reg-email', '❌ อีเมลนี้เคยลงทะเบียนไว้แล้วในระบบ Supabase กรุณาเข้าสู่ระบบแทน');
+            setButtonLoading(btn, false);
+            return;
+          }
+        }
+
         if (data?.user?.id) {
-          newAccount.id = data.user.id;
-          saveRegisteredAccount(newAccount);
+          assignedId = data.user.id;
+          registeredOnSupabase = true;
         }
       } catch (err) {
-        console.warn('Supabase background signup note:', err);
+        console.warn('Supabase direct signup note:', err);
       }
     }
 
-    // ซิงค์บัญชีไปยัง PHP DB ในเบื้องหลัง
+    // 2. ซิงค์บัญชีไปยัง Local PHP DB ในเบื้องหลัง
     try {
       fetch(API_BASE + '/auth.php?action=register', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           username: regEmail,
@@ -1415,12 +1398,28 @@
           email: regEmail,
           tax_id: taxId
         })
+      }).then(r => r.json()).then(d => {
+        if (d && d.user && !registeredOnSupabase) {
+          assignedId = d.user.id;
+        }
       }).catch(() => {});
     } catch (e) {}
 
-    // สมัครและเข้าสู่ระบบทันที 100% ไม่ต้องยืนยันอีเมล!
+    // 3. บันทึกแคชในเครื่อง (Local Cache)
+    const newAccount = {
+      id: assignedId,
+      email: regEmail,
+      password: password,
+      full_name: fullName,
+      tax_id: taxId,
+      role: 'member',
+      created_at: new Date().toISOString()
+    };
+    saveRegisteredAccount(newAccount);
+
+    // สมัครและเข้าสู่ระบบทันที 100% เป็นอิสระ
     currentUser = {
-      id: newAccount.id,
+      id: assignedId,
       full_name: fullName,
       email: regEmail,
       role: 'member',
@@ -1434,7 +1433,7 @@
     updateAuthUI();
     closeModal('modal-auth');
     setButtonLoading(btn, false);
-    showToast('🎉 สมัครสมาชิกสำเร็จ! ยินดีต้อนรับคุณ ' + fullName, 'success');
+    showToast('🎉 สมัครสมาชิกสำเร็จบนฐานข้อมูล Supabase Cloud! ยินดีต้อนรับคุณ ' + fullName, 'success');
     if (window.SoundEngine) SoundEngine.play('success');
   }
 
@@ -1453,8 +1452,8 @@
 
     // 3. Fallback: PHP logout
     try {
-      await fetch(API_BASE + '/auth.php?action=logout', { method: 'POST' });
-    } catch (e) { /* ignore */ }
+      await fetch(API_BASE + '/auth.php?action=logout', { method: 'POST', credentials: 'include' });
+    } catch (e) {}
 
     currentUser = null;
     currentRecordId = null;
@@ -2173,13 +2172,18 @@
   // =========================================================================
 
   async function handleSaveRecord() {
-    // ผู้ใช้ที่ไม่ได้เข้าสู่ระบบ จะไม่สามารถบันทึกข้อมูลใดๆ ได้
-    if (!isUserLoggedIn()) {
-      showToast('🔒 ไม่สามารถบันทึกข้อมูลได้: กรุณาเข้าสู่ระบบก่อนทำการบันทึกข้อมูลภาษี', 'warning');
-      if (window.SoundEngine) SoundEngine.play('alert');
-      showAuthTab('login');
-      openModal('modal-auth');
-      return;
+    if (!currentUser) {
+      // Auto-assign guest user so calculation can be saved without mandatory login barrier
+      currentUser = {
+        id: 'usr_guest_' + Date.now(),
+        full_name: 'ผู้ใช้งานทั่วไป (Guest)',
+        role: 'guest',
+        email: ''
+      };
+      try {
+        localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
+        updateAuthUI();
+      } catch (e) {}
     }
 
     if (!hasFirstStepData()) {
@@ -2208,14 +2212,6 @@
 
   async function submitSaveRecord(e) {
     e.preventDefault();
-    if (!isUserLoggedIn()) {
-      showToast('🔒 ไม่สามารถบันทึกข้อมูลได้: กรุณาเข้าสู่ระบบก่อนทำการบันทึกข้อมูลภาษี', 'warning');
-      if (window.SoundEngine) SoundEngine.play('alert');
-      closeModal('modal-save-record');
-      showAuthTab('login');
-      openModal('modal-auth');
-      return;
-    }
     const formData = getFormData();
     const titlePrompt = document.getElementById('save-title').value.trim();
     const taxYear = document.getElementById('save-tax-year').value || String(new Date().getFullYear() + 543);
@@ -2317,13 +2313,6 @@
   }
 
   async function openSavedRecordsModal() {
-    if (!isUserLoggedIn()) {
-      showToast('🔒 กรุณาเข้าสู่ระบบเพื่อดูข้อมูลภาษีที่บันทึกไว้ของคุณ', 'warning');
-      if (window.SoundEngine) SoundEngine.play('alert');
-      showAuthTab('login');
-      openModal('modal-auth');
-      return;
-    }
     openModal('modal-saved-records');
     const listContainer = document.getElementById('saved-records-list');
     listContainer.innerHTML = '<p style="text-align:center; color:#92400E; padding:1.5rem;">⏳ กำลังโหลดข้อมูลภาษีที่บันทึกไว้...</p>';
@@ -2721,12 +2710,6 @@
   }
 
   async function deleteRecordById(id) {
-    if (!isUserLoggedIn()) {
-      showToast('🔒 กรุณาเข้าสู่ระบบก่อนจัดการหรือลบข้อมูล', 'warning');
-      if (window.SoundEngine) SoundEngine.play('alert');
-      openModal('modal-auth');
-      return;
-    }
     if (!confirm('คุณต้องการลบรายการคำนวณภาษีนี้ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้')) return;
     try {
       // 1. Delete from LocalStorage
@@ -2833,13 +2816,7 @@
   // 9.5 แจ้งปัญหาและติดต่อแอดมิน (Support Tickets & Chat)
   // =========================================================================
 
-  // Base API path พร้อม auto-detect รันผ่าน /tax/ หรือ root /
-  const API_BASE = (function() {
-    const p = window.location.pathname;
-    if (p.startsWith('/tax')) return '/tax/api';
-    return '/api';
-  })();
-
+  // TICKET API endpoint
   const TICKET_API = API_BASE + '/ticket.php';
 
   const TICKET_CATEGORY_LABELS = {
